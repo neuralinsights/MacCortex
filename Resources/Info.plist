@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+
+    <key>CFBundleExecutable</key>
+    <string>MacCortex</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>com.maccortex.app</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>CFBundleName</key>
+    <string>MacCortex</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>0.5.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2026 MacCortex Project. All rights reserved.</string>
+
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <!-- Sparkle 自动更新配置（Phase 0.5 Day 10） -->
+    <key>SUFeedURL</key>
+    <string>https://maccortex.app/appcast.xml</string>
+
+    <key>SUPublicEDKey</key>
+    <string><!-- 待 Day 10 生成 EdDSA 公钥后填写 --></string>
+
+    <!-- 隐私权限说明（TCC） -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>MacCortex needs to control other applications to automate your workflows.</string>
+
+    <key>NSSystemAdministrationUsageDescription</key>
+    <string>MacCortex needs Full Disk Access to read and organize your files, notes, and documents.</string>
+
+</dict>
+</plist>
