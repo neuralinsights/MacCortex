@@ -1,0 +1,302 @@
+name: MacCortex Release CI/CD
+
+# MacCortex Phase 0.5 - Day 5
+# GitHub Actions 自动构建、签名、公证和发布流程
+# 创建时间: 2026-01-20
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'      # 触发条件: 推送版本标签 (例如: v0.5.0)
+  workflow_dispatch:  # 允许手动触发
+
+env:
+  APP_NAME: MacCortex
+  SCHEME: MacCortex
+  CONFIGURATION: Release
+
+jobs:
+  build-and-release:
+    name: 构建、签名、公证和发布
+    runs-on: macos-14  # 使用 macOS 14 (Sonoma)
+
+    steps:
+      # ==========================================
+      # 1. 代码检出
+      # ==========================================
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史记录（用于版本号）
+
+      # ==========================================
+      # 2. 设置 Xcode 环境
+      # ==========================================
+      - name: 选择 Xcode 版本
+        run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+
+      - name: 验证 Xcode 配置
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # ==========================================
+      # 3. 恢复 SPM 依赖
+      # ==========================================
+      - name: 缓存 SPM 依赖
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: 解析依赖
+        run: swift package resolve
+
+      # ==========================================
+      # 4. 导入代码签名证书
+      # ==========================================
+      - name: 导入 Developer ID 证书
+        env:
+          # GitHub Secrets 需要配置:
+          # - DEVELOPER_ID_CERT_BASE64: Developer ID 证书 (.p12 文件 base64 编码)
+          # - DEVELOPER_ID_CERT_PASSWORD: .p12 文件密码
+          CERT_BASE64: ${{ secrets.DEVELOPER_ID_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          echo "导入代码签名证书到 Keychain..."
+
+          # 创建临时 keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # 导入证书
+          echo "$CERT_BASE64" | base64 --decode > certificate.p12
+          security import certificate.p12 \
+            -k "$KEYCHAIN_PATH" \
+            -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/productsign
+
+          # 设置为默认 keychain
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # 验证证书
+          security find-identity -v -p codesigning
+
+          # 清理临时文件
+          rm -f certificate.p12
+
+      # ==========================================
+      # 5. 构建应用
+      # ==========================================
+      - name: 构建 macOS 应用
+        run: |
+          echo "开始构建 $APP_NAME..."
+
+          # 使用 xcodebuild 构建（Phase 1 会切换到 SPM）
+          # 当前使用占位符，实际需要 Xcode 项目文件
+
+          # 创建临时构建目录
+          mkdir -p build
+
+          # TODO: 实际构建命令（需要 Xcode 项目）
+          # xcodebuild \
+          #   -project MacCortex.xcodeproj \
+          #   -scheme "$SCHEME" \
+          #   -configuration "$CONFIGURATION" \
+          #   -derivedDataPath ./DerivedData \
+          #   build
+
+          echo "⚠️  构建步骤待 Xcode 项目创建后完善"
+
+      # ==========================================
+      # 6. 代码签名
+      # ==========================================
+      - name: 签名应用
+        env:
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID_NAME }}
+        run: |
+          echo "开始签名流程..."
+
+          # 使用我们的签名脚本
+          # ./Scripts/sign.sh build/$APP_NAME.app
+
+          echo "⚠️  签名步骤待应用构建完成后执行"
+
+      # ==========================================
+      # 7. 公证应用
+      # ==========================================
+      - name: 公证应用
+        env:
+          # GitHub Secrets 需要配置:
+          # - APPLE_ID: Apple ID 邮箱
+          # - APPLE_TEAM_ID: Team ID
+          # - APPLE_APP_PASSWORD: App-Specific Password
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          echo "开始公证流程..."
+
+          # 创建 ZIP 用于公证
+          # ditto -c -k --keepParent build/$APP_NAME.app build/$APP_NAME.zip
+
+          # 提交公证
+          # xcrun notarytool submit build/$APP_NAME.zip \
+          #   --apple-id "$APPLE_ID" \
+          #   --team-id "$APPLE_TEAM_ID" \
+          #   --password "$APPLE_APP_PASSWORD" \
+          #   --wait
+
+          # Staple 票据
+          # xcrun stapler staple build/$APP_NAME.app
+
+          echo "⚠️  公证步骤待应用签名完成后执行"
+
+      # ==========================================
+      # 8. 创建 DMG
+      # ==========================================
+      - name: 创建 DMG 安装包
+        run: |
+          echo "创建 DMG..."
+
+          # 提取版本号
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+          # 使用我们的 DMG 脚本
+          # export VERSION=$VERSION
+          # ./Scripts/build-dmg.sh build/$APP_NAME.app
+
+          echo "⚠️  DMG 创建待应用构建完成后执行"
+
+      # ==========================================
+      # 9. 生成 Release Notes
+      # ==========================================
+      - name: 生成 Release Notes
+        id: release_notes
+        run: |
+          # 获取上一个 tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "首次发布"
+            RELEASE_NOTES="MacCortex 首个公开版本"
+          else
+            echo "生成 $PREVIOUS_TAG..HEAD 的变更日志..."
+            RELEASE_NOTES=$(git log $PREVIOUS_TAG..HEAD --pretty=format:"- %s" --no-merges)
+          fi
+
+          # 输出到 GitHub Actions
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          echo "$RELEASE_NOTES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      # ==========================================
+      # 10. 创建 GitHub Release
+      # ==========================================
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: MacCortex ${{ env.VERSION }}
+          body: |
+            ## MacCortex ${{ env.VERSION }}
+
+            ### 变更内容
+            ${{ env.RELEASE_NOTES }}
+
+            ### 安装说明
+            1. 下载 `MacCortex-v${{ env.VERSION }}.dmg`
+            2. 双击 DMG 文件
+            3. 将 MacCortex.app 拖到 Applications 文件夹
+            4. 首次启动时，按照引导授予 Full Disk Access 权限
+
+            ### 系统要求
+            - macOS 14.0 (Sonoma) 或更高版本
+            - Apple Silicon 或 Intel 处理器
+
+            ### 验证签名
+            ```bash
+            spctl --assess --type execute /Applications/MacCortex.app
+            codesign -dv --verbose=4 /Applications/MacCortex.app
+            ```
+
+            ---
+
+            🤖 由 GitHub Actions 自动构建和发布
+          files: |
+            build/MacCortex-v${{ env.VERSION }}.dmg
+          draft: true  # 创建为草稿，手动审核后发布
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ==========================================
+      # 11. 上传构建产物
+      # ==========================================
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacCortex-${{ env.VERSION }}
+          path: |
+            build/MacCortex.app
+            build/MacCortex-v${{ env.VERSION }}.dmg
+          retention-days: 30
+
+      # ==========================================
+      # 12. 清理
+      # ==========================================
+      - name: 清理临时文件
+        if: always()
+        run: |
+          # 删除临时 keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
+
+          # 清理敏感信息
+          rm -f certificate.p12
+
+# ==========================================
+# GitHub Secrets 配置清单
+# ==========================================
+#
+# 在 GitHub 仓库设置中配置以下 Secrets:
+# (Settings → Secrets and variables → Actions → New repository secret)
+#
+# 1. DEVELOPER_ID_CERT_BASE64
+#    - Developer ID 证书 (.p12 文件) 的 base64 编码
+#    - 生成方法:
+#      1) 从 Keychain 导出证书: Keychain Access → Developer ID Application → Export → .p12
+#      2) base64 编码: base64 -i certificate.p12 | pbcopy
+#      3) 粘贴到 GitHub Secret
+#
+# 2. DEVELOPER_ID_CERT_PASSWORD
+#    - 导出 .p12 时设置的密码
+#
+# 3. DEVELOPER_ID_NAME
+#    - 签名身份完整名称 (例如: "Developer ID Application: Your Name (TEAM_ID)")
+#    - 查询方法: security find-identity -v -p codesigning
+#
+# 4. APPLE_ID
+#    - Apple ID 邮箱地址
+#
+# 5. APPLE_TEAM_ID
+#    - Team ID (10 个字符)
+#    - 查询方法: 访问 https://developer.apple.com/account → Membership
+#
+# 6. APPLE_APP_PASSWORD
+#    - App-Specific Password (用于公证)
+#    - 生成方法: https://appleid.apple.com/account/manage → App-Specific Passwords
+#
+# ==========================================
