@@ -1,0 +1,38 @@
+# MacCortex Python Backend - Requirements
+# Phase 1 - Week 2 Day 8-9
+# 创建时间: 2026-01-20
+#
+# 安装: pip install -r requirements.txt
+
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Apple Silicon ML (MLX)
+mlx==0.5.0
+mlx-lm==0.5.0
+
+# LangChain & LangGraph
+langchain==0.1.0
+langchain-community==0.0.13
+langgraph==0.0.20
+
+# Local LLM (Ollama)
+ollama==0.1.6
+
+# Vector Database
+chromadb==0.4.22
+
+# Utilities
+python-dotenv==1.0.0
+loguru==0.7.2
+tenacity==8.2.3
+
+# Development
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0
+black==24.1.1
+ruff==0.1.14

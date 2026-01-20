@@ -57,6 +57,20 @@ __pycache__/
 venv/
 env/
 .venv
+.env
+*.egg-info/
+dist/
+build/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python Backend specific
+Backend/.venv/
+Backend/data/
+Backend/*.egg-info/
+Backend/.env
 
 # 日志和临时文件
 *.log

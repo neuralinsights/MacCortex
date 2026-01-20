@@ -137,9 +137,27 @@ public class PythonBridge {
     /// 健康检查
     /// - Returns: 后端是否健康
     public func healthCheck() async -> Bool {
-        // TODO: 实现健康检查（Day 8-9）
-        // GET /health
-        return false
+        let healthURL = backendURL.appendingPathComponent("/health")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: healthURL)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return false
+            }
+
+            // 尝试解码响应以验证格式
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let status = json["status"] as? String,
+               status == "healthy" {
+                return true
+            }
+
+            return false
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Execution
@@ -153,22 +171,43 @@ public class PythonBridge {
             throw PythonBridgeError.backendNotRunning
         }
 
-        // TODO: 实现实际的 HTTP 请求（Day 8-9）
-        // POST /execute
-        // Body: PythonRequest (JSON)
-        // Response: PythonResponse (JSON)
+        // 构建请求 URL
+        let executeURL = backendURL.appendingPathComponent("/execute")
 
-        // 模拟响应（当前）
-        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 秒
+        // 创建 HTTP 请求
+        var urlRequest = URLRequest(url: executeURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.timeoutInterval = timeout
 
-        return PythonResponse(
-            requestID: request.requestID,
-            success: false,
-            output: nil,
-            metadata: nil,
-            error: "Python backend not implemented yet (Day 8-9)",
-            duration: 0.1
-        )
+        // 编码请求体
+        let encoder = JSONEncoder()
+        urlRequest.httpBody = try encoder.encode(request)
+
+        // 发送请求
+        do {
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+            // 检查 HTTP 状态码
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw PythonBridgeError.invalidResponse("Invalid HTTP response")
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw PythonBridgeError.communicationFailed("HTTP \(httpResponse.statusCode)")
+            }
+
+            // 解码响应
+            let decoder = JSONDecoder()
+            let pythonResponse = try decoder.decode(PythonResponse.self, from: data)
+
+            return pythonResponse
+
+        } catch let error as PythonBridgeError {
+            throw error
+        } catch {
+            throw PythonBridgeError.communicationFailed(error.localizedDescription)
+        }
     }
 
     /// 批量执行 Python Pattern
@@ -207,12 +246,43 @@ public class PythonBridge {
     /// 获取后端版本信息
     /// - Returns: 版本信息字典
     public func getVersion() async throws -> [String: String] {
-        // TODO: 实现版本查询（Day 8-9）
-        // GET /version
-        return [
-            "python": "unknown",
-            "backend": "unknown"
-        ]
+        let versionURL = backendURL.appendingPathComponent("/version")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: versionURL)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                throw PythonBridgeError.communicationFailed("HTTP request failed")
+            }
+
+            // 解码 JSON 响应
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                var versionInfo: [String: String] = [:]
+
+                if let python = json["python"] as? String {
+                    versionInfo["python"] = python
+                }
+                if let backend = json["backend"] as? String {
+                    versionInfo["backend"] = backend
+                }
+                if let mlx = json["mlx"] as? String {
+                    versionInfo["mlx"] = mlx
+                }
+                if let ollama = json["ollama"] as? String {
+                    versionInfo["ollama"] = ollama
+                }
+
+                return versionInfo
+            }
+
+            throw PythonBridgeError.invalidResponse("Failed to parse version response")
+
+        } catch let error as PythonBridgeError {
+            throw error
+        } catch {
+            throw PythonBridgeError.communicationFailed(error.localizedDescription)
+        }
     }
 }
 

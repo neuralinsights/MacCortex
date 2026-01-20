@@ -1,0 +1,70 @@
+# MacCortex Python Backend
+# Phase 1 - Week 2 Day 8-9
+# 创建时间: 2026-01-20
+#
+# Python 后端项目配置（Poetry）
+
+[tool.poetry]
+name = "maccortex-backend"
+version = "0.1.0"
+description = "MacCortex Python Backend - AI Pattern Execution Engine"
+authors = ["MacCortex Team"]
+readme = "README.md"
+python = "^3.10"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+# Web Framework
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+
+# Apple Silicon ML (MLX)
+mlx = "^0.5.0"
+mlx-lm = "^0.5.0"
+
+# LangChain & LangGraph
+langchain = "^0.1.0"
+langchain-community = "^0.0.13"
+langgraph = "^0.0.20"
+
+# Local LLM (Ollama)
+ollama = "^0.1.6"
+
+# Vector Database
+chromadb = "^0.4.22"
+
+# Utilities
+python-dotenv = "^1.0.0"
+loguru = "^0.7.2"
+tenacity = "^8.2.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.4"
+pytest-asyncio = "^0.23.3"
+httpx = "^0.26.0"
+black = "^24.1.1"
+ruff = "^0.1.14"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
