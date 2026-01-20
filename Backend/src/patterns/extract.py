@@ -6,8 +6,10 @@
 # MacCortex ExtractPattern - 信息提取模式
 # Phase 1 - Week 2 Day 9
 # 创建时间: 2026-01-20
+# 更新时间: 2026-01-21 (Phase 1.5 - Day 3: 集成 PromptGuard)
 #
 # 从文本中提取结构化信息（实体、关键词、联系方式、日期等）
+# Phase 1.5: 增强安全防护（Prompt Injection 检测、指令隔离、输出清理）
 
 import asyncio
 from typing import Any, Dict
@@ -30,6 +32,7 @@ class ExtractPattern(BasePattern):
     """
 
     def __init__(self):
+        super().__init__()  # Phase 1.5: 初始化安全模块
         self._mlx_model = None
         self._mlx_tokenizer = None
         self._ollama_client = None
@@ -119,7 +122,7 @@ class ExtractPattern(BasePattern):
 
     async def execute(self, text: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
-        执行信息提取
+        执行信息提取（Phase 1.5: 增强安全防护）
 
         Args:
             text: 输入文本
@@ -130,6 +133,7 @@ class ExtractPattern(BasePattern):
                 - extract_dates: 是否提取日期时间 (默认: true)
                 - custom_entities: 自定义实体类型列表 (可选)
                 - language: 语言 (默认: "zh-CN")
+                - source: 输入来源 (默认: "user") - Phase 1.5
 
         Returns:
             提取结果字典
@@ -141,16 +145,30 @@ class ExtractPattern(BasePattern):
         extract_dates = parameters.get("extract_dates", True)
         custom_entities = parameters.get("custom_entities", [])
         language = parameters.get("language", "zh-CN")
+        source = parameters.get("source", "user")  # Phase 1.5: 输入来源
 
-        # 根据模式选择生成方法
+        # ==================== Phase 1.5: Layer 3 - 检测 Prompt Injection ====================
+        injection_result = self._check_injection(text, source=source)
+        if injection_result["is_malicious"]:
+            logger.warning(
+                f"🔒 检测到潜在 Prompt Injection: "
+                f"置信度={injection_result['confidence']:.2%}, "
+                f"严重程度={injection_result['severity']}"
+            )
+
+        # ==================== Phase 1.5: 构建系统提示（不含用户输入）====================
+        system_prompt = self._build_system_prompt(
+            entity_types, extract_keywords, extract_contacts, extract_dates, custom_entities, language
+        )
+
+        # ==================== Phase 1.5: Layer 1+2 - 保护提示词 ====================
+        protected_prompt = self._protect_prompt(system_prompt, text, source=source)
+
+        # 根据模式选择生成方法（Phase 1.5: 使用受保护的提示）
         if self._mode == "mlx":
-            result = await self._extract_with_mlx(
-                text, entity_types, extract_keywords, extract_contacts, extract_dates, custom_entities, language
-            )
+            result = await self._extract_with_mlx_protected(protected_prompt)
         elif self._mode == "ollama":
-            result = await self._extract_with_ollama(
-                text, entity_types, extract_keywords, extract_contacts, extract_dates, custom_entities, language
-            )
+            result = await self._extract_with_ollama_protected(protected_prompt)
         else:
             # Mock 模式
             result = await self._extract_mock(
@@ -169,6 +187,9 @@ class ExtractPattern(BasePattern):
         import json
         output = json.dumps(extraction_result, ensure_ascii=False, indent=2)
 
+        # ==================== Phase 1.5: Layer 5 - 清理输出 ====================
+        output = self._sanitize_output(output, text)
+
         return {
             "output": output,
             "metadata": {
@@ -178,8 +199,15 @@ class ExtractPattern(BasePattern):
                 "extract_dates": extract_dates,
                 "custom_entities": custom_entities,
                 "language": language,
+                "source": source,
                 "text_length": len(text),
                 "mode": self._mode,
+                # Phase 1.5: 安全元数据
+                "security": {
+                    "injection_detected": injection_result["is_malicious"],
+                    "injection_confidence": injection_result["confidence"],
+                    "injection_severity": injection_result["severity"],
+                },
             },
         }
 
@@ -364,3 +392,102 @@ Extraction tasks:
         # 如果无法解析，返回默认结构
         logger.warning(f"无法解析提取输出，返回默认结构: {output[:100]}")
         return {"entities": {}, "keywords": [], "contacts": {}, "dates": []}
+
+    # ==================== Phase 1.5: 安全增强方法 ====================
+
+    def _build_system_prompt(
+        self,
+        entity_types: list,
+        extract_keywords: bool,
+        extract_contacts: bool,
+        extract_dates: bool,
+        custom_entities: list,
+        language: str,
+    ) -> str:
+        """构建系统提示（Phase 1.5: 不含用户输入）"""
+        if language == "zh-CN":
+            prompt = """你是一个专业的信息提取助手。
+请根据以下要求从用户提供的文本中提取结构化信息：
+
+提取任务：
+"""
+            if entity_types:
+                entity_names = {"person": "人名", "organization": "组织机构", "location": "地点"}
+                types_str = "、".join([entity_names.get(t, t) for t in entity_types])
+                prompt += f"1. 实体识别：{types_str}\n"
+
+            if extract_keywords:
+                prompt += "2. 关键词提取：提取 3-5 个核心关键词\n"
+
+            if extract_contacts:
+                prompt += "3. 联系方式：邮箱、电话、网址\n"
+
+            if extract_dates:
+                prompt += "4. 日期时间：提取所有日期和时间信息\n"
+
+            if custom_entities:
+                prompt += f"5. 自定义实体：{', '.join(custom_entities)}\n"
+
+            prompt += "\n请以 JSON 格式输出结果。\n\n重要规则：\n"
+            prompt += "1. 仅从用户文本中提取信息，不要编造\n"
+            prompt += "2. 保持客观准确，按 JSON 格式输出\n"
+            prompt += "3. 如果某类信息不存在，对应字段留空\n"
+        else:
+            prompt = """You are a professional information extraction assistant.
+Extract structured information from the user's text according to the following requirements:
+
+Extraction tasks:
+"""
+            if entity_types:
+                prompt += f"1. Named entities: {', '.join(entity_types)}\n"
+
+            if extract_keywords:
+                prompt += "2. Keywords: Extract 3-5 core keywords\n"
+
+            if extract_contacts:
+                prompt += "3. Contact information: emails, phones, URLs\n"
+
+            if extract_dates:
+                prompt += "4. Dates and times: Extract all date/time information\n"
+
+            if custom_entities:
+                prompt += f"5. Custom entities: {', '.join(custom_entities)}\n"
+
+            prompt += "\nPlease output the result in JSON format.\n\nImportant rules:\n"
+            prompt += "1. Only extract information from user text, do not fabricate\n"
+            prompt += "2. Be objective and accurate, output in JSON format\n"
+            prompt += "3. If certain information does not exist, leave the field empty\n"
+
+        return prompt
+
+    async def _extract_with_mlx_protected(self, protected_prompt: str) -> Dict[str, Any]:
+        """使用 MLX 模型进行信息提取（Phase 1.5: 使用受保护的提示）"""
+        from mlx_lm import generate
+
+        logger.debug("  🍎 使用 MLX 生成（受保护提示）...")
+
+        # 生成（同步方法，需要在线程池中运行）
+        loop = asyncio.get_event_loop()
+        output = await loop.run_in_executor(
+            None,
+            generate,
+            self._mlx_model,
+            self._mlx_tokenizer,
+            protected_prompt,
+            512,  # max_tokens
+        )
+
+        # 解析输出为结构化数据
+        return self._parse_extraction_output(output)
+
+    async def _extract_with_ollama_protected(self, protected_prompt: str) -> Dict[str, Any]:
+        """使用 Ollama 进行信息提取（Phase 1.5: 使用受保护的提示）"""
+        logger.debug(f"  🦙 使用 Ollama 生成（受保护提示）...")
+
+        # 生成
+        response = await self._ollama_client.generate(
+            model=settings.ollama_model, prompt=protected_prompt, options={"temperature": 0.3, "num_predict": 512}
+        )
+
+        # 解析输出
+        return self._parse_extraction_output(response["response"])

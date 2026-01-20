@@ -6,6 +6,9 @@
 # MacCortex FormatPattern - 格式转换模式
 # Phase 1 - Week 2 Day 9
 # 创建时间: 2026-01-20
+# 更新时间: 2026-01-21 (Phase 1.5 - Day 3: 集成 PromptGuard)
+#
+# Phase 1.5: 增强安全防护（Prompt Injection 检测、指令隔离、输出清理）
 #
 # 文本格式转换（JSON ↔ YAML, Markdown ↔ HTML, CSV ↔ JSON 等）
 
@@ -30,6 +33,7 @@ class FormatPattern(BasePattern):
     """
 
     def __init__(self):
+        super().__init__()  # Phase 1.5: 初始化安全模块
         self._mlx_model = None
         self._mlx_tokenizer = None
         self._ollama_client = None
