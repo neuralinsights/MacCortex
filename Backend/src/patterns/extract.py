@@ -152,12 +152,20 @@ class ExtractPattern(BasePattern):
                 text, entity_types, extract_keywords, extract_contacts, extract_dates, custom_entities, language
             )
 
-        return {
+        # 构建提取结果
+        extraction_result = {
             "entities": result.get("entities", {}),
             "keywords": result.get("keywords", []) if extract_keywords else [],
             "contacts": result.get("contacts", {}) if extract_contacts else {},
             "dates": result.get("dates", []) if extract_dates else [],
-            "mode": self._mode,
+        }
+
+        # 序列化为 JSON 字符串（统一输出格式）
+        import json
+        output = json.dumps(extraction_result, ensure_ascii=False, indent=2)
+
+        return {
+            "output": output,
             "metadata": {
                 "entity_types": entity_types,
                 "extract_keywords": extract_keywords,
@@ -166,6 +174,7 @@ class ExtractPattern(BasePattern):
                 "custom_entities": custom_entities,
                 "language": language,
                 "text_length": len(text),
+                "mode": self._mode,
             },
         }
 

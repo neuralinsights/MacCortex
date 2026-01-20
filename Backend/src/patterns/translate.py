@@ -153,8 +153,7 @@ class TranslatePattern(BasePattern):
             )
 
         return {
-            "translation": translation,
-            "mode": self._mode,
+            "output": translation,  # 统一输出格式
             "metadata": {
                 "source_language": source_language,
                 "target_language": target_language,
@@ -163,6 +162,7 @@ class TranslatePattern(BasePattern):
                 "glossary_size": len(glossary),
                 "original_length": len(text),
                 "translation_length": len(translation),
+                "mode": self._mode,
             },
         }
 

@@ -174,16 +174,24 @@ class SearchPattern(BasePattern):
         if summarize and results:
             summary = await self._summarize_results(text, results)
 
-        return {
+        # 序列化搜索结果为 JSON 字符串（统一输出格式）
+        search_result = {
             "results": results[:num_results],
             "summary": summary,
-            "mode": self._mode,
+        }
+
+        import json
+        output = json.dumps(search_result, ensure_ascii=False, indent=2)
+
+        return {
+            "output": output,  # 统一输出格式
             "metadata": {
                 "search_type": search_type,
                 "engine": engine,
                 "num_results": num_results,
                 "query": text,
                 "total_found": len(results),
+                "mode": self._mode,
             },
         }
 

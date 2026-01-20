@@ -148,8 +148,7 @@ class FormatPattern(BasePattern):
             raise ValueError(f"格式转换失败: {e}")
 
         return {
-            "converted": converted,
-            "mode": self._mode,
+            "output": converted,  # 统一输出格式
             "metadata": {
                 "from_format": from_format,
                 "to_format": to_format,
@@ -157,6 +156,7 @@ class FormatPattern(BasePattern):
                 "minify": minify,
                 "original_length": len(text),
                 "converted_length": len(converted),
+                "mode": self._mode,
             },
         }
 
