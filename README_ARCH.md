@@ -10,11 +10,13 @@
 
 | 属性 | 值 |
 |---|---|
-| 文档版本 | v1.0 (Architecture Design) |
-| 项目状态 | 规划与原型验证阶段 |
+| 文档版本 | v1.1 (Architecture Design) |
+| 最后更新 | 2026-01-20（修正 Sandbox 策略矛盾，增加 Phase 0.5） |
+| 项目状态 | Phase 0.5 实施中（签名与公证基础设施） |
 | 目标平台 | macOS（优先利用原生 Vision / Shortcuts / AppleScript / Keychain 等能力） |
 | 核心理念 | 融合 **Swarm Intelligence（蜂群智能）** 与 **Personal Infrastructure（个人基建）** |
 | 设计关键词 | Local-first、Human-in-the-loop、安全可审计、可替换组件、可进化能力库 |
+| 分发策略 | **非 App Sandbox 架构**（独立分发，Homebrew Cask + 官网下载）⚠️ |
 
 > **定位一句话**：MacCortex 不是“另一个聊天窗口”，而是一套可插拔的 macOS 原生智能基础设施：能看见屏幕、能调用工具、能自我纠错、能长期记住你，并且把危险动作锁在笼子里。
 
@@ -36,6 +38,7 @@
 - [12. 开放问题](#12-开放问题)
 - [附录 A：建议目录结构](#附录-a建议目录结构)
 - [附录 B：Context 与 Policy 示例](#附录-bcontext-与-policy-示例)
+- [附录 C：架构决策记录（ADR）](#附录-c架构决策记录adr)
 - [参考与上游项目](#参考与上游项目)
 
 ---
@@ -53,7 +56,11 @@
 - 在**复杂任务**上做到：可编排、可循环自纠错、可中断恢复（Swarm Slow Lane）。
 - 在**系统执行**上做到：最小权限、逐级授权、全程审计（Policy + Sandbox + Audit）。
 
-> 重要说明：本文档是 v1.0 架构设计稿。涉及的模型、框架与工具链均为“可替换组件”，不把任何单一供应商绑定成不可替换依赖。
+> **重要说明**：
+> - 本文档为 v1.1 架构设计稿（2026-01-20 更新）
+> - 当前状态：**Phase 0.5 实施中**（签名、公证、权限管理基础设施）
+> - 架构决策：采用 **非 App Sandbox** 架构（见 ADR-001）
+> - 涉及的模型、框架与工具链均为"可替换组件"，不把任何单一供应商绑定成不可替换依赖
 
 ---
 
@@ -180,13 +187,28 @@ graph TD
 **能力清单（v1）**
 
 - **Selection Capture**：读取当前选中文本（优先）。
+  - ⚠️ **需要权限**：macOS **Accessibility 权限**（系统偏好设置 → 隐私与安全性 → 辅助功能）
+  - 实现方式：`AXUIElement` API（macOS 原生无障碍 API）
+  - 降级策略：用户拒绝授权时回退到"手动复制文本"模式
 - **Screen Snapshot + OCR（可选）**：对当前活动窗口/屏幕区域截图，使用 macOS 原生 OCR（Vision 框架）提取文本。
+  - ⚠️ **需要权限**：macOS **Screen Recording 权限**（可选功能，默认关闭）
 - **App/Workspace Context**：当前前台应用、窗口标题、路径（若在 Terminal/IDE）。
 - **(Optional) Audio**：语音输入/关键词唤醒（默认关闭，避免隐私与电量问题）。
 
+**权限授权策略（关键用户体验设计）**
+
+MacCortex 首次启动需要 **两个敏感权限**：
+1. **Full Disk Access**（读取文件系统/Notes）- Phase 0.5 已实现
+2. **Accessibility**（读取选中文本）- Phase 2 实现
+
+为降低用户流失率，采用 **统一授权引导**：
+- 在同一个 UI 流程中说明两个权限的用途
+- 提供 15 秒演示视频（一次性展示所有授权步骤）
+- 支持"稍后授权"（进入降级模式）
+
 **输出**：写入 `context.json`（短期上下文），供 Router/Pattern/Swarm 使用。
 
-> 可靠性原则：感知层不直接触发执行；只生成“上下文”，让决策层可控地调用。
+> 可靠性原则：感知层不直接触发执行；只生成"上下文"，让决策层可控地调用。
 
 ---
 
@@ -310,12 +332,27 @@ Slow Lane 必须是**可循环**的，而不是一次性链式调用。
 - 采用 JXA/AppleScript/Shortcuts 的方式对 Notes/Mail/Calendar/Finder 等进行可控操作。
 - 所有动作必须输出“将做什么”的摘要，并进入 Policy 审批。
 
-#### 5.6.3 沙箱策略（强制要求）
+#### 5.6.3 权限策略（非 Sandbox 架构）⚠️
 
-- 默认把执行放在隔离环境：container/VM/受限目录。
-- 文件写入策略：
-  - 默认只允许在 Workspace（例如 `~/MacCortexWorkspace/`）内写入
-  - 对 `~/`、`/`、`/System`、`/Library` 等敏感路径默认只读或禁止
+> **重要架构决策（ADR-001）**：MacCortex 采用 **非 App Sandbox 架构**，原因：
+> - Full Disk Access 权限与 App Sandbox 互斥（macOS 限制）
+> - JXA/AppleScript 控制 Notes/Mail/Finder 需要非 Sandbox 环境
+> - 决策日期：2026-01-20（Phase 0.5 实施过程中确定）
+
+**三重防护机制（替代 Sandbox）**
+
+1. **Hardened Runtime**：代码签名 + Entitlements 严格限制
+2. **Policy Engine**：R0-R3 风险分级 + 工具白名单
+3. **受控目录**：默认只允许在 Workspace 内写入
+
+**文件访问策略**
+- ✅ **允许读取**：`~/MacCortexWorkspace/**`、用户授权的 Full Disk Access 路径
+- ⚠️ **需确认写入**：`~/MacCortexWorkspace/**`（默认需 dry-run/diff 预览）
+- ❌ **禁止写入**：`/System`、`/Library`、`/usr`、`~/.ssh`、`~/Library/Keychains`
+
+**符号链接防护**
+- 所有文件操作前解析真实路径（`realpath`）
+- 拒绝指向禁止区域的符号链接
 
 ---
 
@@ -422,7 +459,43 @@ MacCortex 的风险与传统 App 不同：它会“读上下文 + 调工具 + �
 
 ## 10. 实施路线图与里程碑
 
-> 原则：每一阶段都必须有可运行交付物；禁止“先造大城堡再装门”。
+> 原则：每一阶段都必须有可运行交付物；禁止"先造大城堡再装门"。
+
+### Phase 0.5：macOS 签名与公证基础设施 ✨ **[当前进行中]**
+
+> **重要性**：生产级分发能力是所有后续 Phase 的先决条件。Phase 0.5 确保应用能通过 Gatekeeper，合法获取系统权限，并支持自动更新。
+
+**交付物（10天工期：2026-01-20 ~ 2026-01-27）**
+- ✅ Developer ID 签名 + Hardened Runtime 配置（`MacCortex.entitlements`）
+- ✅ Apple 公证自动化（`xcrun notarytool` + GitHub Actions CI/CD）
+- ✅ Full Disk Access 权限管理（`PermissionsKit` Swift Package）
+- ✅ Sparkle 2 自动更新集成（EdDSA 签名）
+- ✅ 首次启动授权 UI（SwiftUI `FirstRunView`）
+- ✅ 用户教育资源（FAQ + 60秒演示视频脚本）
+
+**Phase 0.5 验收标准（P0 阻塞性，必须 100% 通过）**
+
+| # | 验收项 | 测试命令 | 期望结果 | 状态 |
+|---|--------|----------|----------|------|
+| 1 | **签名验证** | `spctl --assess --type execute MacCortex.app` | 输出: `accepted` | ⏳ Day 3 |
+| 2 | **公证成功** | `xcrun stapler validate MacCortex.dmg` | 输出: `validate action worked` | ⏳ Day 4 |
+| 3 | **Gatekeeper 放行** | 下载 DMG → 双击安装 → 打开 | 无安全警告，直接启动 | ⏳ Day 4 |
+| 4 | **授权流程** | 首次启动 → 引导 → 授权 FDA + Accessibility | 总耗时 < 60 秒 | ⏳ Day 8 |
+| 5 | **Sparkle 检测** | 应用内「检查更新」 | 显示更新状态 | ⏳ Day 10 |
+
+**关键架构决策（ADR-001）**
+- ❌ **不采用 App Sandbox**：Full Disk Access 与 App Sandbox 互斥
+- ✅ **采用非 Sandbox 架构**：Hardened Runtime + Policy Engine + 受控目录
+- ✅ **独立分发**：非 App Store，Homebrew Cask + 官网直接下载
+- ✅ **权限策略**：FDA（必需）+ Accessibility（可选但推荐）
+
+**Phase 0.5 完成后解锁**
+- ✅ 应用可在任意 macOS 设备安全分发
+- ✅ 用户可授权 Full Disk Access（访问文件系统/Notes）
+- ✅ 自动更新机制就绪（无需用户手动下载）
+- ✅ 为 Phase 1-4 扫清所有分发与权限障碍
+
+---
 
 ### Phase 0：工程基座（Foundation）
 
@@ -447,9 +520,13 @@ MacCortex 的风险与传统 App 不同：它会“读上下文 + 调工具 + �
 **交付**
 - Spotlight 风格输入框（或 Raycast Extension）
 - 选中文本 + OCR 注入 context
+- **Accessibility 权限授权流程**（与 Phase 0.5 FDA 权限合并引导）
+- 降级模式实现（用户拒绝 Accessibility 时回退到手动复制）
 
 **验收**
 - 不手动复制内容也能完成一次 Pattern 处理
+- Accessibility 授权流程 < 30 秒（与 FDA 合并后总时长 < 60 秒）
+- 降级模式可用（拒绝授权后仍可通过手动复制使用 80% 功能）
 
 ### Phase 3：Hands（System Control + 安全回环）
 
@@ -572,6 +649,94 @@ rules:
 
 ---
 
+## 附录 C：架构决策记录（ADR）
+
+> Architecture Decision Records - 记录关键技术决策的理由、影响与权衡
+
+### ADR-001: 采用非 Sandbox 架构（2026-01-20）
+
+**背景**
+- MacCortex 需要 Full Disk Access（读取文件系统/Notes/日历等）
+- 需要通过 JXA/AppleScript 控制 macOS 原生应用（Notes/Mail/Finder）
+
+**决策**
+- ❌ **不采用 App Sandbox**
+- ✅ **采用 Hardened Runtime + Policy Engine + 受控目录**
+
+**理由**
+1. **技术限制**：Full Disk Access 与 App Sandbox 互斥（macOS 系统限制）
+2. **功能需求**：JXA/AppleScript 在 Sandbox 内完全无法控制其他应用
+3. **安全替代方案**：三重防护（Hardened Runtime + Policy Engine + 受控目录）可达到同等安全级别
+
+**影响**
+- ✅ 核心功能完整（Notes 访问、批量文件操作、系统自动化）
+- ❌ 无法上架 Mac App Store（只能独立分发）
+- ✅ 可通过 Homebrew Cask、官网直接下载分发
+- ⚠️ 需要用户授权 Full Disk Access（敏感权限，需优秀的引导 UI）
+
+**验证**
+- Phase 0.5 实施过程中验证（2026-01-20 ~ 2026-01-27）
+- 成功案例：Raycast、Homebrew、Docker Desktop 均采用非 Sandbox 架构
+
+**状态**：✅ 已确认并实施
+
+---
+
+### ADR-002: 优先采用 LangGraph 作为 Swarm 编排引擎（建议）
+
+**背景**
+- 文档提出两条路线：LangGraph（Python）vs claude-flow（Node.js）
+- 需要在 Phase 4 前明确选择
+
+**建议决策**
+- ✅ **优先 LangGraph**
+- 🔄 **claude-flow 作为 Phase 4 后的可选适配层**
+
+**理由**
+1. **技术栈一致性**：Phase 0.5 已用 Python/Swift，LangGraph（Python）无缝集成
+2. **Human-in-the-loop 原生支持**：LangGraph 的 `interrupt` 机制成熟（见 CLAUDE.md 证据清单）
+3. **MLX 集成**：与本地 MLX 模型（Phase 3+）Python 原生对接
+4. **状态持久化**：LangGraph 的检查点/断点恢复能力更强
+5. **生态成熟度**：LangChain 生态（工具/Agent/记忆管理）可复用
+
+**权衡**
+- ❌ claude-flow 的 87 个 MCP 工具生态无法直接复用
+- ✅ 但可通过 MCP Client（Python）接入相同的 MCP Servers
+- ⚠️ 团队需学习 LangGraph 状态图设计（学习曲线约 1-2 周）
+
+**影响**
+- Phase 4 工期保持 6 周（LangGraph 学习 + 编排实现 + 测试）
+- Phase 5（可选）可增加 claude-flow 适配层，支持 Node.js 工具生态
+
+**状态**：💬 待最终确认（建议在 Phase 3 结束前决策）
+
+---
+
+### ADR-003: Accessibility + Full Disk Access 统一授权引导（建议）
+
+**背景**
+- MacCortex 需要两个敏感权限：FDA（必需）+ Accessibility（推荐）
+- 用户对多次敏感权限请求的容忍度低（拒绝率可能达 30-40%）
+
+**建议决策**
+- ✅ **在首次启动时统一说明两个权限**
+- ✅ **提供 15 秒演示视频（一次性展示所有步骤）**
+- ✅ **支持"稍后授权"降级模式**
+
+**理由**
+1. **用户体验**：一次性讲清楚胜过分两次打扰
+2. **转化率优化**：降低"第二次被拒绝"的概率
+3. **降级友好**：拒绝 Accessibility 仍可用 80% 功能（手动复制模式）
+
+**影响**
+- Phase 0.5 实现 FDA 授权 UI
+- Phase 2 增强 UI，合并 Accessibility 授权说明
+- Phase 2 验收标准：两个权限授权总时长 < 60 秒
+
+**状态**：💬 待 Phase 2 实施（2026-01 下旬）
+
+---
+
 ## 参考与上游项目
 
 > 以下链接用于“可验证事实来源”。本项目不隶属于这些上游仓库；MacCortex 是一个独立的架构设计与实现计划。
@@ -606,8 +771,19 @@ rules:
 
 ---
 
-**文档维护建议**
+**文档维护记录**
 
-- v1.1：补“路由与策略决策的可解释性”（为什么走 Fast/Slow、为什么拒绝工具）
-- v1.2：补“插件权限声明（capabilities）与签名机制”
-- v1.3：补“评估基准（Benchmark tasks）与安全测试集”
+- ✅ **v1.1 (2026-01-20)**：修正 Sandbox 策略矛盾，增加 Phase 0.5 里程碑，新增附录 C（ADR）
+- 📋 **v1.2（待定）**：补"路由与策略决策的可解释性"（为什么走 Fast/Slow、为什么拒绝工具）
+- 📋 **v1.3（待定）**：补"插件权限声明（capabilities）与签名机制"
+- 📋 **v1.4（待定）**：补"评估基准（Benchmark tasks）与安全测试集"
+
+**v1.1 主要变更（2026-01-20）**
+
+| 变更类型 | 章节 | 内容 |
+|---------|------|------|
+| 🔴 **修正矛盾** | 5.6.3 | 删除 Sandbox 强制要求，改为"非 Sandbox + 三重防护" |
+| ⚠️ **补充缺失** | 5.1 | 增加 Accessibility 权限说明与降级策略 |
+| ✨ **新增里程碑** | 10 | 插入 Phase 0.5（签名与公证基础设施） |
+| 📋 **架构决策** | 附录 C | 新增 ADR-001（非 Sandbox）、ADR-002（LangGraph）、ADR-003（统一授权） |
+| 📝 **元信息更新** | 元信息表 | 版本 v1.0 → v1.1，增加"分发策略"行 |
