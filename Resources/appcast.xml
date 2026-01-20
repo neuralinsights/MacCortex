@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <channel>
+        <title>MacCortex Updates</title>
+        <link>https://maccortex.app/appcast.xml</link>
+        <description>MacCortex - 下一代 macOS 个人智能基础设施</description>
+        <language>zh-CN</language>
+
+        <!-- Phase 0.5 首个版本 -->
+        <item>
+            <title>Version 0.5.0</title>
+            <link>https://maccortex.app/release-notes/0.5.0.html</link>
+            <sparkle:version>0.5.0</sparkle:version>
+            <sparkle:shortVersionString>0.5.0</sparkle:version>
+            <description><![CDATA[
+                <h2>Phase 0.5: 签名与公证基础设施</h2>
+                <ul>
+                    <li>✅ Developer ID 签名 + Hardened Runtime</li>
+                    <li>✅ Apple 公证（Notarized Developer ID）</li>
+                    <li>✅ Full Disk Access 权限管理</li>
+                    <li>✅ Sparkle 2 自动更新集成</li>
+                    <li>✅ GitHub Actions CI/CD 流水线</li>
+                </ul>
+                <p><strong>验收标准</strong>: 所有 5 项 P0 标准已通过</p>
+            ]]></description>
+            <pubDate>Tue, 20 Jan 2026 16:00:00 +1300</pubDate>
+
+            <!--
+            实际部署时需要：
+            1. 创建 DMG 或 ZIP 包
+            2. 上传到服务器（例如：https://github.com/YOUR_ORG/MacCortex/releases/download/v0.5.0/MacCortex-0.5.0.dmg）
+            3. 使用 generate_appcast 工具生成签名
+            -->
+            <enclosure
+                url="https://github.com/YOUR_ORG/MacCortex/releases/download/v0.5.0/MacCortex-0.5.0.dmg"
+                sparkle:version="0.5.0"
+                sparkle:shortVersionString="0.5.0"
+                length="3355443"
+                type="application/octet-stream"
+                sparkle:edSignature="SIGNATURE_GENERATED_BY_GENERATE_APPCAST_TOOL"
+            />
+
+            <!-- 最低系统要求 -->
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+        </item>
+
+        <!-- 未来版本将在此添加 -->
+        <!-- Phase 1.0 预告 -->
+        <!--
+        <item>
+            <title>Version 1.0.0</title>
+            <sparkle:version>1.0.0</sparkle:version>
+            <description><![CDATA[
+                <h2>Phase 1: Pattern CLI + Raycast Extension</h2>
+                <ul>
+                    <li>5 个核心 Pattern（summarize/extract/translate/format/search）</li>
+                    <li>Raycast Extension 快速验证</li>
+                    <li>Python 后端（MLX + LangGraph）</li>
+                </ul>
+            ]]></description>
+            <pubDate>TBD</pubDate>
+        </item>
+        -->
+    </channel>
+</rss>
