@@ -1,6 +1,6 @@
 # MacCortex Python Backend
 
-**Phase 1 - 已完成** | **Phase 1.5 - 进行中（Day 1-5 已完成）**
+**Phase 1 - 已完成** | **Phase 1.5 - 进行中（Day 1-7 已完成）**
 **创建时间**: 2026-01-20 | **更新时间**: 2026-01-21
 
 AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持。
@@ -21,6 +21,7 @@ AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持�
 - ✅ **向后兼容**: 100% 兼容现有 API
 - ✅ **审计日志**: PII 脱敏 + GDPR 合规（Day 4-5 已完成）
 - ✅ **安全中间件**: 请求追踪 + IP 哈希（Day 4-5 已完成）
+- ✅ **输入验证**: 参数白名单 + 危险模式检测（Day 6-7 已完成）
 - ⏳ **速率限制**: 60/min, 1000/hour（Day 8）
 
 ## 快速开始
@@ -169,7 +170,12 @@ Backend/
 │   ├── security/                  # 安全模块（Phase 1.5）
 │   │   ├── __init__.py
 │   │   ├── security_config.py    # 安全配置（270 行）
-│   │   └── prompt_guard.py       # PromptGuard 核心（480 行）
+│   │   ├── prompt_guard.py       # PromptGuard 核心（480 行）
+│   │   ├── audit_logger.py       # 审计日志系统（350 行，Day 4-5）
+│   │   └── input_validator.py    # 输入验证器（280 行，Day 6-7）
+│   ├── middleware/                # 中间件（Phase 1.5）
+│   │   ├── __init__.py
+│   │   └── security_middleware.py # 安全中间件（135 行，Day 4-5）
 │   └── utils/                     # 工具模块
 │       ├── __init__.py
 │       ├── config.py             # 配置管理
@@ -303,6 +309,73 @@ app.add_middleware(SecurityMiddleware, enable_audit_log=True)
 - ✅ **异常捕获**: 自动记录请求错误为安全事件
 - ✅ **审计集成**: 请求开始/结束自动记录
 
+### 输入验证与参数白名单（Day 6-7 已完成）
+
+MacCortex 实施了严格的输入验证机制，防止参数注入和恶意输入攻击：
+
+#### InputValidator - 参数白名单
+```python
+from security.input_validator import get_input_validator
+
+validator = get_input_validator()
+
+# 验证 Pattern ID
+is_valid, error = validator.validate_pattern_id("summarize")
+# → (True, None)
+
+# 验证并清理文本
+is_valid, error, cleaned_text = validator.validate_text("Hello\x00World")
+# → (True, None, "HelloWorld")  # null 字节被移除
+
+# 验证参数（白名单检查）
+is_valid, error, validated = validator.validate_parameters(
+    pattern_id="summarize",
+    parameters={"length": "medium", "language": "zh-CN"}
+)
+# → (True, None, {"length": "medium", "language": "zh-CN"})
+```
+
+**所有 5 个 Pattern 的参数白名单**:
+- **summarize**: `length` (short/medium/long), `style` (bullet/paragraph/headline), `language` (zh-CN/en-US/...)
+- **extract**: `entity_types` (person/organization/...), `extract_keywords`, `extract_contacts`, `language`
+- **translate**: `target_language`, `source_language`, `style` (formal/casual/technical)
+- **format**: `from_format` (json/yaml/csv/...), `to_format`, `prettify`
+- **search**: `search_type` (web/semantic/hybrid), `engine` (duckduckgo), `num_results` (1-20)
+
+**输入清理功能**:
+- ✅ **Null 字节移除**: 防止字符串截断攻击
+- ✅ **Unicode 标准化**: NFKC 标准化防止 Unicode 绕过
+- ✅ **长度限制**: 50,000 字符上限
+- ✅ **危险模式检测**: 控制字符、Script 标签、JavaScript 协议、事件处理器
+
+**Pydantic 集成**（main.py）:
+```python
+class PatternRequest(BaseModel):
+    pattern_id: str = Field(..., max_length=50)
+    text: str = Field(..., max_length=50_000)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("pattern_id")
+    @classmethod
+    def validate_pattern_id(cls, v: str) -> str:
+        """Pattern ID 白名单检查"""
+        validator = get_input_validator()
+        is_valid, error = validator.validate_pattern_id(v)
+        if not is_valid:
+            raise ValueError(error)
+        return v
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        """文本清理与验证"""
+        validator = get_input_validator()
+        is_valid, error, cleaned = validator.validate_text(v)
+        if not is_valid:
+            raise ValueError(error)
+        return cleaned
+```
+
 ### 安全 API 示例
 
 ```python
@@ -334,12 +407,13 @@ result = await pattern.execute(
 
 | 测试套件 | 通过率 | 说明 |
 |---------|-------|------|
-| **test_prompt_guard.py** | 91% (86/91) | PromptGuard 核心功能 |
+| **test_prompt_guard.py** | 87% (33/38) | PromptGuard 核心功能 |
 | **test_audit_logger.py** | 100% (36/36) | 审计日志系统（Day 4-5） |
 | **test_security_middleware.py** | 100% (17/17) | 安全中间件（Day 4-5） |
+| **test_input_validator.py** | 100% (50/50) | 输入验证系统（Day 6-7） ⭐ |
 | **test_phase1.5_integration.py** | 100% (30/30) | 所有 5 个 Pattern 集成 |
 | **test_all_patterns.py** | 100% (5/5) | 向后兼容性验证 |
-| **总体通过率** | **97% (174/180)** | **含 Day 4-5** |
+| **总体通过率** | **97% (186/191)** | **含 Day 6-7** |
 
 ### 性能开销
 

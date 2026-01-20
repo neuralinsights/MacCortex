@@ -25,6 +25,7 @@ from .prompt_guard import (
     protect_prompt,
 )
 from .audit_logger import PIIRedactor, AuditLogger, get_audit_logger
+from .input_validator import InputValidator, get_input_validator
 
 __all__ = [
     "SecurityConfig",
@@ -37,4 +38,6 @@ __all__ = [
     "PIIRedactor",
     "AuditLogger",
     "get_audit_logger",
+    "InputValidator",
+    "get_input_validator",
 ]

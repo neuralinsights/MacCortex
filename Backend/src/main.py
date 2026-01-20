@@ -4,7 +4,7 @@
 MacCortex Python Backend - FastAPI Application
 Phase 1 - Week 2 Day 8-9
 创建时间: 2026-01-20
-更新时间: 2026-01-21 (Phase 1.5 - Day 4-5: 集成审计日志系统)
+更新时间: 2026-01-21 (Phase 1.5 - Day 6-7: 集成输入验证与参数白名单)
 
 FastAPI 服务，用于执行需要 Python 后端的 AI Pattern
 
@@ -26,6 +26,7 @@ _OWNER_HASH = "8f3b5c7a9e1d2f4b6a8c0e3f5d7b9a1c3e5f7d9b"  # Hidden identifier
 
 import os
 import sys
+import unicodedata
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict
@@ -35,7 +36,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # 添加 src 到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -107,10 +108,10 @@ app.add_middleware(SecurityMiddleware, enable_audit_log=True)
 
 
 class PatternRequest(BaseModel):
-    """Pattern 执行请求"""
+    """Pattern 执行请求（Phase 1.5 Day 6-7: 增强输入验证）"""
 
-    pattern_id: str = Field(..., description="Pattern ID")
-    text: str = Field(..., description="输入文本")
+    pattern_id: str = Field(..., description="Pattern ID", max_length=50)
+    text: str = Field(..., description="输入文本", max_length=50_000)
     parameters: Dict[str, Any] = Field(default_factory=dict, description="参数字典")
     request_id: str = Field(default="", description="请求 ID（可选）")
 
@@ -126,6 +127,37 @@ class PatternRequest(BaseModel):
             ]
         }
     }
+
+    @field_validator("pattern_id")
+    @classmethod
+    def validate_pattern_id(cls, v: str) -> str:
+        """验证 Pattern ID（白名单检查）"""
+        from security.input_validator import get_input_validator
+
+        validator = get_input_validator()
+        is_valid, error = validator.validate_pattern_id(v)
+
+        if not is_valid:
+            raise ValueError(error)
+
+        return v
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, v: str) -> str:
+        """验证并清理输入文本"""
+        if not isinstance(v, str):
+            raise ValueError(f"文本必须是字符串，当前类型: {type(v).__name__}")
+
+        from security.input_validator import get_input_validator
+
+        validator = get_input_validator()
+        is_valid, error, cleaned_text = validator.validate_text(v)
+
+        if not is_valid:
+            raise ValueError(error)
+
+        return cleaned_text
 
 
 class PatternResponse(BaseModel):
@@ -259,23 +291,39 @@ async def get_copyright():
 
 @app.post("/execute", response_model=PatternResponse, summary="Execute pattern")
 async def execute_pattern(request: PatternRequest):
-    """执行 AI Pattern（Phase 1.5: 含审计日志）"""
+    """执行 AI Pattern（Phase 1.5: 含审计日志 + 输入验证）"""
     start_time = datetime.now()
 
     # Phase 1.5: 获取审计日志器
     from security.audit_logger import get_audit_logger
     audit_logger = get_audit_logger()
 
+    # Phase 1.5 Day 6-7: 获取输入验证器
+    from security.input_validator import get_input_validator
+    input_validator = get_input_validator()
+
     try:
         logger.info(f"📥 收到请求: pattern={request.pattern_id}, request_id={request.request_id}")
 
+        # Phase 1.5 Day 6-7: 验证参数（白名单检查）
+        is_valid, error, validated_params = input_validator.validate_parameters(
+            pattern_id=request.pattern_id,
+            parameters=request.parameters,
+        )
+
+        if not is_valid:
+            logger.warning(f"⚠️ 参数验证失败: {error}")
+            raise ValueError(error)
+
+        logger.debug(f"✅ 参数验证通过: {validated_params}")
+
         registry: PatternRegistry = app.state.registry
 
-        # 执行 Pattern
+        # 执行 Pattern（使用验证后的参数）
         result = await registry.execute(
             pattern_id=request.pattern_id,
             text=request.text,
-            parameters=request.parameters,
+            parameters=validated_params,
         )
 
         duration = (datetime.now() - start_time).total_seconds()
