@@ -1,0 +1,10 @@
+fastapi==0.128.0
+mlx==0.30.3
+mlx-lm==0.30.4
+mlx-metal==0.30.3
+numpy==2.4.1
+pydantic==2.12.5
+pydantic-settings==2.12.0
+pydantic_core==2.41.5
+transformers==5.0.0rc1
+uvicorn==0.40.0
