@@ -39,8 +39,9 @@
     <key>SUFeedURL</key>
     <string>https://maccortex.app/appcast.xml</string>
 
+    <!-- 待 Day 10 生成 EdDSA 公钥后填写 -->
     <key>SUPublicEDKey</key>
-    <string><!-- 待 Day 10 生成 EdDSA 公钥后填写 --></string>
+    <string>PLACEHOLDER_WILL_BE_REPLACED_IN_DAY_10</string>
 
     <!-- 隐私权限说明（TCC） -->
     <key>NSAppleEventsUsageDescription</key>
