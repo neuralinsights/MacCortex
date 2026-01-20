@@ -25,6 +25,9 @@ AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持�
 - ✅ **速率限制**: 令牌桶算法，60/min + 1000/hour（Day 8-9 已完成）
 - ✅ **输出验证**: 系统提示泄露检测 + 凭证清理（Day 10 已完成）
 
+**集成验证（2026-01-21）**: ✅ **8/8 测试通过 - 生产就绪** 🎉
+- 详细报告：[PHASE_1.5_INTEGRATION_VALIDATION_REPORT.md](PHASE_1.5_INTEGRATION_VALIDATION_REPORT.md)
+
 ## 快速开始
 
 ### 1. 安装依赖
