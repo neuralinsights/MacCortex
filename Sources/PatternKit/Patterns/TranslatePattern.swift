@@ -9,7 +9,7 @@ import Foundation
 /// 翻译 Pattern
 ///
 /// 将文本翻译成目标语言，支持多种语言对
-public class TranslatePattern: Pattern {
+public class TranslatePattern: AIPattern {
     public let id = "translate"
     public let name = "Translate"
     public let description = "Translate text between languages"
@@ -74,10 +74,7 @@ public class TranslatePattern: Pattern {
         let targetLanguage = extractTargetLanguage(from: input.parameters)
         let style = extractStyle(from: input.parameters)
 
-        // 验证语言对
-        guard sourceLanguage != targetLanguage else {
-            throw PatternError.invalidInput("Source and target languages are the same")
-        }
+        // 注意：语言对验证已在 validate() 中完成（修复 P0 #3）
 
         // TODO: 实际调用 Python 后端
         let translated = try await performTranslation(
@@ -105,7 +102,13 @@ public class TranslatePattern: Pattern {
 
     public func validate(input: PatternInput) -> Bool {
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !text.isEmpty
+        guard !text.isEmpty else { return false }
+
+        // 验证语言对（修复 P0 #3：从 execute() 移到 validate()）
+        let sourceLanguage = extractSourceLanguage(from: input.parameters)
+        let targetLanguage = extractTargetLanguage(from: input.parameters)
+
+        return sourceLanguage != targetLanguage
     }
 
     // MARK: - Private Methods

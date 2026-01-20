@@ -9,31 +9,33 @@ final class EdgeCaseTests: XCTestCase {
 
     // MARK: - 输入验证边界测试
 
-    /// 测试：恰好 49 个字符（SummarizePattern 应该拒绝）
+    /// 测试：词数不足（SummarizePattern 应该拒绝）
     func testSummarizePattern_Exactly49Characters() async {
         let pattern = SummarizePattern()
+        // 英文：少于 30 词应该被拒绝
         let input = PatternInput(
-            text: String(repeating: "a", count: 49),
-            parameters: [:]
+            text: Array(repeating: "word", count: 20).joined(separator: " "),  // 20 词
+            parameters: ["language": "en"]
         )
 
-        XCTAssertFalse(pattern.validate(input: input), "49 字符应该被拒绝（< 50）")
+        XCTAssertFalse(pattern.validate(input: input), "20 词应该被拒绝（< 30 词）")
     }
 
-    /// 测试：恰好 50 个字符（SummarizePattern 应该接受）
+    /// 测试：词数刚好（SummarizePattern 应该接受）
     func testSummarizePattern_Exactly50Characters() async {
         let pattern = SummarizePattern()
+        // 英文：30 词应该被接受
         let input = PatternInput(
-            text: String(repeating: "a", count: 50),
-            parameters: [:]
+            text: Array(repeating: "word", count: 30).joined(separator: " "),  // 30 词
+            parameters: ["language": "en"]
         )
 
-        XCTAssertTrue(pattern.validate(input: input), "50 字符应该被接受")
+        XCTAssertTrue(pattern.validate(input: input), "30 词应该被接受")
     }
 
     /// 测试：纯空白字符（应该被所有 Pattern 拒绝）
     func testAllPatterns_WhitespaceOnlyInput() {
-        let patterns: [PatternKit.Pattern] = [
+        let patterns: [PatternKit.AIPattern] = [
             SummarizePattern(),
             ExtractPattern(),
             TranslatePattern(),
@@ -62,7 +64,7 @@ final class EdgeCaseTests: XCTestCase {
 
     /// 测试：空字符串
     func testAllPatterns_EmptyString() {
-        let patterns: [PatternKit.Pattern] = [
+        let patterns: [PatternKit.AIPattern] = [
             SummarizePattern(),
             ExtractPattern(),
             TranslatePattern(),
@@ -83,7 +85,7 @@ final class EdgeCaseTests: XCTestCase {
     func testAllPatterns_ExtremelyLongInput() async throws {
         let hugeText = String(repeating: "A", count: 10_000_000) // 10MB
 
-        let patterns: [PatternKit.Pattern] = [
+        let patterns: [PatternKit.AIPattern] = [
             SummarizePattern(),
             TranslatePattern()
         ]
@@ -138,11 +140,15 @@ final class EdgeCaseTests: XCTestCase {
             ]
         )
 
+        // 修复 P0 #3 后，validate() 会在执行前检查语言对
+        XCTAssertFalse(pattern.validate(input: input), "相同语言对应该验证失败")
+
+        // PatternRegistry.execute() 会因为 validate() 返回 false 而抛出错误
         do {
-            _ = try await pattern.execute(input: input)
+            _ = try await PatternRegistry.shared.execute(patternID: "translate", input: input)
             XCTFail("相同语言对应该抛出错误")
-        } catch PatternError.invalidInput(let message) {
-            XCTAssertTrue(message.contains("same"), "错误信息应该说明是相同语言")
+        } catch PatternError.invalidInput {
+            // 预期的错误
         } catch {
             XCTFail("应该抛出 invalidInput 错误，而非 \(error)")
         }
@@ -184,7 +190,7 @@ final class EdgeCaseTests: XCTestCase {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for i in 0..<100 {
                 group.addTask {
-                    let pattern = MockPattern(id: "conflict_test")
+                    let pattern = MockAIPattern(id: "conflict_test")
                     if i % 2 == 0 {
                         try? registry.register(pattern)
                     } else {
@@ -204,7 +210,7 @@ final class EdgeCaseTests: XCTestCase {
     /// 测试：执行中取消注册
     func testPatternRegistry_UnregisterDuringExecution() async throws {
         let registry = PatternRegistry.shared
-        let pattern = MockPattern(id: "executing_pattern")
+        let pattern = MockAIPattern(id: "executing_pattern")
         try registry.register(pattern)
 
         let input = PatternInput(text: "test", parameters: [:])
@@ -295,4 +301,4 @@ final class EdgeCaseTests: XCTestCase {
     }
 }
 
-// MockPattern 定义在 TestHelpers.swift
+// MockAIPattern 定义在 TestHelpers.swift

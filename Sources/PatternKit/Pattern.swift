@@ -60,10 +60,11 @@ public struct PatternInput {
     }
 }
 
-/// Pattern 协议
+/// AI Pattern 协议
 ///
-/// 所有 Pattern 必须实现此协议
-public protocol Pattern {
+/// 所有 AI Pattern 必须实现此协议
+/// 注意：原名为 Pattern，但与 macOS Quickdraw.h 中的 Pattern 结构体冲突，故重命名为 AIPattern
+public protocol AIPattern {
     /// Pattern 唯一标识符
     var id: String { get }
 
@@ -136,9 +137,9 @@ public enum PatternError: Error, LocalizedError {
     }
 }
 
-// MARK: - Pattern Extension
+// MARK: - AIPattern Extension
 
-extension Pattern {
+extension AIPattern {
     /// 默认验证实现（检查输入文本非空）
     public func validate(input: PatternInput) -> Bool {
         return !input.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

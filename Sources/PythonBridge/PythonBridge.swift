@@ -234,7 +234,17 @@ public struct AnyCodable: Codable {
         } else if let double = try? container.decode(Double.self) {
             value = double
         } else if let string = try? container.decode(String.self) {
-            value = string
+            // 修复 P1 #7: 解码特殊 Double 值
+            switch string {
+            case "Infinity":
+                value = Double.infinity
+            case "-Infinity":
+                value = -Double.infinity
+            case "NaN":
+                value = Double.nan
+            default:
+                value = string
+            }
         } else if let bool = try? container.decode(Bool.self) {
             value = bool
         } else if let array = try? container.decode([AnyCodable].self) {
@@ -253,7 +263,14 @@ public struct AnyCodable: Codable {
         case let int as Int:
             try container.encode(int)
         case let double as Double:
-            try container.encode(double)
+            // 修复 P1 #7: 处理特殊 Double 值（Infinity, NaN）
+            if double.isInfinite {
+                try container.encode(double > 0 ? "Infinity" : "-Infinity")
+            } else if double.isNaN {
+                try container.encode("NaN")
+            } else {
+                try container.encode(double)
+            }
         case let string as String:
             try container.encode(string)
         case let bool as Bool:

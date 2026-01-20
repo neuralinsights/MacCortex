@@ -9,7 +9,7 @@ import Foundation
 /// 格式化 Pattern
 ///
 /// 转换文本格式，包括 Markdown、HTML、JSON、YAML 等格式之间的转换
-public class FormatPattern: Pattern {
+public class FormatPattern: AIPattern {
     public let id = "format"
     public let name = "Format"
     public let description = "Convert text between different formats"
@@ -196,20 +196,94 @@ public class FormatPattern: Pattern {
     }
 
     private func convertMarkdownToPlaintext(_ markdown: String) throws -> String {
-        // 简单移除 Markdown 标记
+        // 改进的 Markdown → Plaintext 转换（修复 P1 #5）
         var text = markdown
 
-        // 移除标题标记
-        text = text.replacingOccurrences(of: #"^#+\s+"#, with: "", options: .regularExpression)
+        // 1. 先处理代码块（避免内部 Markdown 被处理）
+        text = text.replacingOccurrences(
+            of: #"```[\s\S]*?```"#,
+            with: "[CODE]",
+            options: .regularExpression
+        )
 
-        // 移除粗体、斜体
-        text = text.replacingOccurrences(of: #"\*\*([^\*]+)\*\*"#, with: "$1", options: .regularExpression)
-        text = text.replacingOccurrences(of: #"\*([^\*]+)\*"#, with: "$1", options: .regularExpression)
+        // 2. 处理行内代码
+        text = text.replacingOccurrences(
+            of: #"`([^`]+)`"#,
+            with: "$1",
+            options: .regularExpression
+        )
 
-        // 移除链接但保留文本
-        text = text.replacingOccurrences(of: #"\[([^\]]+)\]\([^\)]+\)"#, with: "$1", options: .regularExpression)
+        // 3. 移除标题标记（多行模式）
+        text = text.replacingOccurrences(
+            of: #"(?m)^#+\s*"#,  // (?m) 启用多行模式
+            with: "",
+            options: .regularExpression
+        )
 
-        return text
+        // 4. 移除粗体（非贪婪匹配，修复嵌套问题）
+        text = text.replacingOccurrences(
+            of: #"\*\*(.+?)\*\*"#,  // 使用 .+? 非贪婪
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 5. 移除斜体
+        text = text.replacingOccurrences(
+            of: #"\*(.+?)\*"#,  // 非贪婪
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 6. 移除删除线
+        text = text.replacingOccurrences(
+            of: #"~~(.+?)~~"#,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 7. 移除链接但保留文本
+        text = text.replacingOccurrences(
+            of: #"\[([^\]]+)\]\([^\)]+\)"#,
+            with: "$1",
+            options: .regularExpression
+        )
+
+        // 8. 移除图片（完全移除）
+        text = text.replacingOccurrences(
+            of: #"!\[([^\]]*)\]\([^\)]+\)"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 9. 移除列表标记
+        text = text.replacingOccurrences(
+            of: #"(?m)^[\s]*[-*+]\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 10. 移除有序列表标记
+        text = text.replacingOccurrences(
+            of: #"(?m)^[\s]*\d+\.\s+"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 11. 移除引用标记
+        text = text.replacingOccurrences(
+            of: #"(?m)^>\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+
+        // 12. 清理多余空行
+        text = text.replacingOccurrences(
+            of: #"\n{3,}"#,
+            with: "\n\n",
+            options: .regularExpression
+        )
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func convertJSONToYAML(_ json: String, options: FormatOptions) throws -> String {

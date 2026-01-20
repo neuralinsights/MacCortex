@@ -15,7 +15,7 @@ final class ThreadSafetyStressTests: XCTestCase {
             for i in 0..<100 {
                 group.addTask {
                     // 创建临时 Pattern
-                    let pattern = MockPattern(id: "concurrent_\(i)")
+                    let pattern = MockAIPattern(id: "concurrent_\(i)")
                     try? registry.register(pattern)
                 }
             }
@@ -45,7 +45,7 @@ final class ThreadSafetyStressTests: XCTestCase {
             // 10 个写任务
             for i in 0..<10 {
                 group.addTask {
-                    let pattern = MockPattern(id: "stress_\(i)")
+                    let pattern = MockAIPattern(id: "stress_\(i)")
                     try? registry.register(pattern)
                     registry.unregister("stress_\(i)")
                 }
@@ -93,7 +93,7 @@ final class ThreadSafetyStressTests: XCTestCase {
         measure(metrics: [XCTMemoryMetric()]) {
             // 注册 1000 个 Pattern
             for i in 0..<1000 {
-                let pattern = MockPattern(id: "leak_test_\(i)")
+                let pattern = MockAIPattern(id: "leak_test_\(i)")
                 try? registry.register(pattern)
             }
 
@@ -105,4 +105,4 @@ final class ThreadSafetyStressTests: XCTestCase {
     }
 }
 
-// MockPattern 定义在 TestHelpers.swift
+// MockAIPattern 定义在 TestHelpers.swift

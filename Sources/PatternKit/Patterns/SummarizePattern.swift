@@ -9,7 +9,7 @@ import Foundation
 /// 总结 Pattern
 ///
 /// 将长文本总结为简洁的摘要，提取关键信息和要点
-public class SummarizePattern: Pattern {
+public class SummarizePattern: AIPattern {
     public let id = "summarize"
     public let name = "Summarize"
     public let description = "Summarize long text into concise key points"
@@ -77,8 +77,29 @@ public class SummarizePattern: Pattern {
 
     public func validate(input: PatternInput) -> Bool {
         let text = input.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        // 至少需要 50 个字符才值得总结
-        return text.count >= 50
+
+        // 1. 最小字符数（防止极端短文本）
+        guard text.count >= 10 else { return false }
+
+        // 2. 语言感知的词数检测
+        let language = extractLanguage(from: input.parameters)
+
+        // 3. 词数统计（而非字符数）
+        let wordCount: Int
+        if language.hasPrefix("zh") || language.hasPrefix("ja") || language.hasPrefix("ko") {
+            // 中日韩文字：每个字符约等于一个词
+            wordCount = text.count
+        } else {
+            // 西文：按空格分词
+            wordCount = text.components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.isEmpty }
+                .count
+        }
+
+        // 4. 语言特定的最小词数阈值
+        let minWords = language.hasPrefix("zh") ? 15 : 30  // 中文 15 词，英文 30 词
+
+        return wordCount >= minWords
     }
 
     // MARK: - Private Methods
@@ -100,7 +121,22 @@ public class SummarizePattern: Pattern {
     }
 
     private func extractLanguage(from parameters: [String: Any]) -> String {
-        return parameters["language"] as? String ?? "zh-CN" // 默认中文
+        // 修复 P1 #6: 添加参数白名单验证
+        guard let lang = parameters["language"] as? String else {
+            return "zh-CN"  // 类型错误，使用默认值
+        }
+
+        // 白名单验证（防止注入攻击）
+        let validLanguages: Set<String> = [
+            "zh-CN", "zh-TW", "en", "ja", "ko",
+            "fr", "de", "es", "ru", "ar", "pt", "it"
+        ]
+
+        guard validLanguages.contains(lang) else {
+            return "zh-CN"  // 无效语言代码，使用默认值
+        }
+
+        return lang
     }
 
     private func generateSummary(

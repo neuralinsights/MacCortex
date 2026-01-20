@@ -5,7 +5,7 @@ import Foundation
 @testable import PatternKit
 
 /// Mock Pattern - 用于测试
-class MockPattern: PatternKit.Pattern {
+class MockAIPattern: PatternKit.AIPattern {
     let id: String
     let name = "Mock"
     let description = "Mock Pattern for testing"

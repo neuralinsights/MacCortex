@@ -9,7 +9,7 @@ import Foundation
 /// 提取 Pattern
 ///
 /// 从非结构化文本中提取结构化信息（日期、人名、地点、联系方式等）
-public class ExtractPattern: Pattern {
+public class ExtractPattern: AIPattern {
     public let id = "extract"
     public let name = "Extract"
     public let description = "Extract structured information from unstructured text"

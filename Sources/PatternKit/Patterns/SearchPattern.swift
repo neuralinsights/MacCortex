@@ -9,7 +9,7 @@ import Foundation
 /// 搜索 Pattern
 ///
 /// 在文本或多个文档中进行语义搜索、关键词搜索或正则表达式搜索
-public class SearchPattern: Pattern {
+public class SearchPattern: AIPattern {
     public let id = "search"
     public let name = "Search"
     public let description = "Search and filter text content with semantic or keyword matching"
