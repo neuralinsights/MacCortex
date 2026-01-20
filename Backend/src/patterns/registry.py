@@ -12,6 +12,10 @@ from loguru import logger
 
 from patterns.base import BasePattern
 from patterns.summarize import SummarizePattern
+from patterns.extract import ExtractPattern
+from patterns.translate import TranslatePattern
+from patterns.format import FormatPattern
+from patterns.search import SearchPattern
 
 
 class PatternRegistry:
@@ -32,7 +36,10 @@ class PatternRegistry:
         # 注册默认 Pattern
         patterns = [
             SummarizePattern(),
-            # 其他 Pattern 将在后续添加
+            ExtractPattern(),
+            TranslatePattern(),
+            FormatPattern(),
+            SearchPattern(),
         ]
 
         for pattern in patterns:
