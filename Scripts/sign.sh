@@ -32,27 +32,34 @@ fi
 
 # 签名顺序：XPC Services → Frameworks → App
 echo "步骤 1/3: 签名 XPC Services..."
-for xpc in "${APP_PATH}"/Contents/XPCServices/*.xpc 2>/dev/null; do
-    if [ -e "$xpc" ]; then
+if [ -d "${APP_PATH}/Contents/XPCServices" ]; then
+    shopt -s nullglob  # 如果没有匹配项，glob 返回空
+    for xpc in "${APP_PATH}"/Contents/XPCServices/*.xpc; do
         echo "  - 签名 $(basename "$xpc")"
         codesign --force --sign "$DEVELOPER_ID" \
                  --options runtime \
                  --timestamp \
                  "$xpc"
-    fi
-done
+    done
+    shopt -u nullglob
+fi
+if [ ! -d "${APP_PATH}/Contents/XPCServices" ] || [ -z "$(ls -A "${APP_PATH}/Contents/XPCServices" 2>/dev/null)" ]; then
+    echo "  ⚠️  无 XPC Services（跳过）"
+fi
 
 echo ""
 echo "步骤 2/3: 签名 Frameworks..."
-for framework in "${APP_PATH}"/Contents/Frameworks/*.framework 2>/dev/null; do
-    if [ -e "$framework" ]; then
+if [ -d "${APP_PATH}/Contents/Frameworks" ]; then
+    shopt -s nullglob
+    for framework in "${APP_PATH}"/Contents/Frameworks/*.framework; do
         echo "  - 签名 $(basename "$framework")"
         codesign --force --sign "$DEVELOPER_ID" \
                  --options runtime \
                  --timestamp \
                  "$framework"
-    fi
-done
+    done
+    shopt -u nullglob
+fi
 
 echo ""
 echo "步骤 3/3: 签名主应用..."
