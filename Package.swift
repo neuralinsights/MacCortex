@@ -43,7 +43,14 @@ let package = Package(
             dependencies: [],
             path: "Sources/PermissionsKit"
         ),
-        
+
+        // Pattern 核心模块（Phase 1 Week 2 Day 6-7）
+        .target(
+            name: "PatternKit",
+            dependencies: [],
+            path: "Sources/PatternKit"
+        ),
+
         // Python 桥接模块（Phase 1+）
         .target(
             name: "PythonBridge",
@@ -68,6 +75,15 @@ let package = Package(
                 "PermissionsKit"
             ],
             path: "Tests/MacCortexAppTests"
+        ),
+
+        // Pattern 测试（Phase 1 Week 2 Day 6-7）
+        .testTarget(
+            name: "PatternKitTests",
+            dependencies: [
+                "PatternKit"
+            ],
+            path: "Tests/PatternKitTests"
         ),
     ]
 )
