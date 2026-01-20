@@ -53,11 +53,11 @@ let package = Package(
         
         // 测试目标
         .testTarget(
-            name: "MacCortexTests",
+            name: "PermissionsKitTests",
             dependencies: [
-                "MacCortexApp",
                 "PermissionsKit"
-            ]
+            ],
+            path: "Tests/PermissionsKitTests"
         ),
     ]
 )

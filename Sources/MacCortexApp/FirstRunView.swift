@@ -1,8 +1,10 @@
 // MacCortex 首次启动引导界面
 // Phase 0.5 - Day 8
 // 创建时间：2026-01-20
+// 更新时间：2026-01-20 (Day 6-7: 集成 PermissionsKit)
 
 import SwiftUI
+import PermissionsKit
 
 struct FirstRunView: View {
     @EnvironmentObject var appState: AppState
@@ -74,18 +76,18 @@ struct FirstRunView: View {
     }
 
     private func openSystemPreferences() {
-        // 打开系统设置的 Full Disk Access 页面
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-            NSWorkspace.shared.open(url)
-        }
+        // Phase 0.5 Day 6-7: 使用 PermissionsKit
+        FullDiskAccessManager.shared.openSystemPreferences()
 
-        // 启动轮询检测（Phase 0.5 Day 6-7 实现）
-        // FullDiskAccessManager.shared.requestFullDiskAccess { granted in
-        //     if granted {
-        //         appState.hasFullDiskAccess = true
-        //         appState.isFirstRun = false
-        //     }
-        // }
+        // 启动轮询检测权限变化
+        FullDiskAccessManager.shared.requestFullDiskAccess(timeout: 60, interval: 2) { granted in
+            DispatchQueue.main.async {
+                if granted {
+                    self.appState.hasFullDiskAccess = true
+                    self.appState.isFirstRun = false
+                }
+            }
+        }
     }
 }
 
