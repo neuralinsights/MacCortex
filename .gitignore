@@ -46,6 +46,9 @@ Icon
 private_key.pem
 public_key.pem
 
+# 开发者配置（包含敏感信息）
+Configs/developer-config.env
+
 # Python
 __pycache__/
 *.py[cod]
