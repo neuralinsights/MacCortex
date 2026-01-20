@@ -45,7 +45,11 @@ class SummarizePattern(BasePattern):
             await self._initialize_mlx()
         except Exception as e:
             logger.warning(f"MLX 初始化失败，回退到 Ollama: {e}")
-            await self._initialize_ollama()
+            try:
+                await self._initialize_ollama()
+            except Exception as e2:
+                logger.warning(f"Ollama 初始化失败，使用 Mock 模式: {e2}")
+                logger.info("  ⚠️  使用 Mock 模式（用于测试）")
 
     async def _initialize_mlx(self):
         """初始化 MLX 模型"""
@@ -130,7 +134,9 @@ class SummarizePattern(BasePattern):
         elif self._ollama_client is not None:
             output = await self._generate_with_ollama(prompt)
         else:
-            raise RuntimeError("No model available (MLX or Ollama)")
+            # Mock 模式（用于测试）
+            logger.info("  ⚠️  使用 Mock 输出（MLX/Ollama 未安装）")
+            output = await self._generate_mock(text, length, style, language)
 
         return {
             "output": output,
@@ -213,6 +219,28 @@ class SummarizePattern(BasePattern):
         except Exception as e:
             logger.error(f"Ollama 生成失败: {e}")
             raise RuntimeError(f"Ollama generation failed: {e}")
+
+    async def _generate_mock(
+        self, text: str, length: str, style: str, language: str
+    ) -> str:
+        """使用 Mock 模式生成总结（用于测试）"""
+        import asyncio
+
+        # 模拟处理延迟
+        await asyncio.sleep(0.1)
+
+        word_count = {"short": 50, "medium": 150, "long": 300}.get(length, 150)
+
+        if style == "bullet":
+            return f"""• 核心要点 1：[Mock 输出，MLX/Ollama 未安装]
+• 核心要点 2：原文长度 {len(text)} 字符
+• 核心要点 3：目标总结长度 {word_count} 字
+
+⚠️ 这是测试用 Mock 输出，请安装 MLX 或 Ollama 以使用真实 LLM。"""
+        elif style == "paragraph":
+            return f"[Mock 输出] 这是一段总结性的段落文本。原文长度 {len(text)} 字符，目标总结长度 {word_count} 字。请安装 MLX 或 Ollama 以使用真实 LLM。"
+        else:  # headline
+            return f"[Mock 输出] 核心标题：关键信息摘要（{word_count} 字目标）"
 
     async def cleanup(self):
         """清理资源"""

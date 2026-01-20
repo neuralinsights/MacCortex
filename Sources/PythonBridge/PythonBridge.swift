@@ -96,6 +96,12 @@ public class PythonBridge {
     /// 是否正在运行
     public private(set) var isRunning: Bool = false
 
+    /// 设置运行状态（仅用于测试）
+    /// - Parameter running: 运行状态
+    internal func setRunningState(_ running: Bool) {
+        self.isRunning = running
+    }
+
     // MARK: - Initialization
 
     private init() {

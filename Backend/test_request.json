@@ -1,0 +1,10 @@
+{
+  "pattern_id": "summarize",
+  "text": "MacCortex 是下一代 macOS 个人智能基础设施，集成了 Pattern CLI 框架、Python 后端（MLX + Ollama）以及 LangGraph 工作流编排。项目采用 Swift Package Manager 组织，支持 Apple Silicon 优化。Phase 1 包括 5 个核心 Pattern：summarize、extract、translate、format、search。目标是实现少于 2 秒的 AI 任务延迟。",
+  "parameters": {
+    "length": "medium",
+    "style": "bullet",
+    "language": "zh-CN"
+  },
+  "request_id": "test-001"
+}

@@ -86,5 +86,14 @@ let package = Package(
             ],
             path: "Tests/PatternKitTests"
         ),
+
+        // PythonBridge 集成测试（Phase 1 Week 2 Day 8）
+        .testTarget(
+            name: "PythonBridgeTests",
+            dependencies: [
+                "PythonBridge"
+            ],
+            path: "Tests/PythonBridgeTests"
+        ),
     ]
 )

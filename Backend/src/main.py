@@ -87,15 +87,18 @@ class PatternRequest(BaseModel):
     parameters: Dict[str, Any] = Field(default_factory=dict, description="参数字典")
     request_id: str = Field(default="", description="请求 ID（可选）")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "pattern_id": "summarize",
-                "text": "长文本内容...",
-                "parameters": {"length": "medium", "language": "zh-CN"},
-                "request_id": "req-12345",
-            }
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "pattern_id": "summarize",
+                    "text": "长文本内容...",
+                    "parameters": {"length": "medium", "language": "zh-CN"},
+                    "request_id": "req-12345",
+                }
+            ]
         }
+    }
 
 
 class PatternResponse(BaseModel):
