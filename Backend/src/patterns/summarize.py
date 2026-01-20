@@ -7,8 +7,10 @@
 MacCortex Backend - Summarize Pattern
 Phase 1 - Week 2 Day 8-9
 创建时间: 2026-01-20
+更新时间: 2026-01-21 (Phase 1.5 - Day 3: 集成 PromptGuard)
 
 文本总结 Pattern（使用 MLX 或 Ollama）
+Phase 1.5: 增强安全防护（Prompt Injection 检测、指令隔离、输出清理）
 """
 
 import asyncio
@@ -120,28 +122,45 @@ class SummarizePattern(BasePattern):
     async def execute(
         self, text: str, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """执行总结"""
+        """执行总结（Phase 1.5: 增强安全防护）"""
         # 提取参数
         length = parameters.get("length", "medium")
         style = parameters.get("style", "bullet")
         language = parameters.get("language", "zh-CN")
+        source = parameters.get("source", "user")  # Phase 1.5: 输入来源
 
         logger.info(
-            f"📝 总结文本: length={length}, style={style}, language={language}"
+            f"📝 总结文本: length={length}, style={style}, language={language}, source={source}"
         )
 
-        # 构建提示词
-        prompt = self._build_prompt(text, length, style, language)
+        # ==================== Phase 1.5: Layer 3 - 检测 Prompt Injection ====================
+        injection_result = self._check_injection(text, source=source)
+        if injection_result["is_malicious"]:
+            logger.warning(
+                f"🔒 检测到潜在 Prompt Injection: "
+                f"置信度={injection_result['confidence']:.2%}, "
+                f"严重程度={injection_result['severity']}"
+            )
+            # 标记为不可信输入（继续处理，但加强防护）
+
+        # 构建系统提示（不含用户输入）
+        system_prompt = self._build_system_prompt(length, style, language)
+
+        # ==================== Phase 1.5: Layer 1+2 - 保护提示词 ====================
+        protected_prompt = self._protect_prompt(system_prompt, text, source=source)
 
         # 使用 MLX 或 Ollama 生成总结
         if self._mlx_model is not None:
-            output = await self._generate_with_mlx(prompt)
+            output = await self._generate_with_mlx(protected_prompt)
         elif self._ollama_client is not None:
-            output = await self._generate_with_ollama(prompt)
+            output = await self._generate_with_ollama(protected_prompt)
         else:
             # Mock 模式（用于测试）
             logger.info("  ⚠️  使用 Mock 输出（MLX/Ollama 未安装）")
             output = await self._generate_mock(text, length, style, language)
+
+        # ==================== Phase 1.5: Layer 5 - 清理输出 ====================
+        output = self._sanitize_output(output, text)
 
         return {
             "output": output,
@@ -149,15 +168,20 @@ class SummarizePattern(BasePattern):
                 "length": length,
                 "style": style,
                 "language": language,
+                "source": source,
                 "original_length": len(text),
                 "summary_length": len(output),
+                # Phase 1.5: 安全元数据
+                "security": {
+                    "injection_detected": injection_result["is_malicious"],
+                    "injection_confidence": injection_result["confidence"],
+                    "injection_severity": injection_result["severity"],
+                },
             },
         }
 
-    def _build_prompt(
-        self, text: str, length: str, style: str, language: str
-    ) -> str:
-        """构建 LLM 提示词"""
+    def _build_system_prompt(self, length: str, style: str, language: str) -> str:
+        """构建系统提示（Phase 1.5: 不含用户输入）"""
         # 长度目标
         length_target = {"short": 50, "medium": 150, "long": 300}.get(length, 150)
 
@@ -177,14 +201,26 @@ class SummarizePattern(BasePattern):
             "ko": "한국어로 답변해 주세요",
         }.get(language, "请用中文回答")
 
-        prompt = f"""请总结以下文本，{style_desc}，目标长度约 {length_target} 字。{lang_prompt}。
+        system_prompt = f"""你是一个专业的文本总结助手。
+请根据以下要求总结用户提供的文本：
+- 风格：{style_desc}
+- 目标长度：约 {length_target} 字
+- 语言：{lang_prompt}
 
-原文：
-{text}
+重要规则：
+1. 仅总结用户提供的文本内容，不要添加额外信息
+2. 保持客观中立，不要添加个人观点
+3. 专注于核心要点和关键信息
+"""
 
-总结："""
+        return system_prompt
 
-        return prompt
+    def _build_prompt(
+        self, text: str, length: str, style: str, language: str
+    ) -> str:
+        """构建 LLM 提示词（兼容性方法，Phase 1 代码使用）"""
+        system = self._build_system_prompt(length, style, language)
+        return f"{system}\n\n原文：\n{text}\n\n总结："
 
     async def _generate_with_mlx(self, prompt: str) -> str:
         """使用 MLX 生成文本"""
