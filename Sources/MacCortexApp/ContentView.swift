@@ -21,54 +21,163 @@ struct ContentView: View {
 }
 
 struct MainView: View {
+    @EnvironmentObject var appState: AppState
+    @State private var showSettings = false
+
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "brain.head.profile")
-                .font(.system(size: 80))
-                .foregroundColor(.blue)
+        NavigationView {
+            VStack(spacing: 30) {
+                // 顶部标题区
+                VStack(spacing: 10) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 80))
+                        .foregroundColor(.blue)
 
-            Text("MacCortex")
-                .font(.largeTitle)
-                .fontWeight(.bold)
+                    Text("MacCortex")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
 
-            Text("下一代 macOS 个人智能基础设施")
-                .font(.headline)
-                .foregroundColor(.secondary)
+                    Text("Phase 1 - 开发中")
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundColor(.orange)
+                        .cornerRadius(4)
+                }
 
-            Text("Phase 0.5 - 基础设施建设中")
-                .font(.caption)
-                .foregroundColor(.orange)
+                Spacer()
 
-            Spacer()
+                // 权限状态卡片
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack {
+                        Image(systemName: "lock.shield")
+                            .foregroundColor(.blue)
+                        Text("权限状态")
+                            .font(.headline)
+                    }
 
-            VStack(alignment: .leading, spacing: 10) {
-                StatusRow(icon: "checkmark.circle.fill",
-                         text: "项目目录结构",
-                         status: .completed)
+                    PermissionStatusRow(
+                        icon: "folder.fill",
+                        name: "Full Disk Access",
+                        isGranted: appState.hasFullDiskAccess,
+                        isRequired: true
+                    )
 
-                StatusRow(icon: "checkmark.circle.fill",
-                         text: "Git 仓库初始化",
-                         status: .completed)
+                    PermissionStatusRow(
+                        icon: "cursorarrow.rays",
+                        name: "Accessibility",
+                        isGranted: appState.hasAccessibilityPermission,
+                        isRequired: false
+                    )
 
-                StatusRow(icon: "circle",
-                         text: "Developer ID 证书",
-                         status: .pending)
+                    // 权限管理按钮
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        HStack {
+                            Image(systemName: "gear")
+                            Text("管理权限")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(8)
+                    }
+                }
+                .padding()
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(10)
 
-                StatusRow(icon: "circle",
-                         text: "代码签名配置",
-                         status: .pending)
+                // Phase 状态
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack {
+                        Image(systemName: "list.bullet.clipboard")
+                            .foregroundColor(.blue)
+                        Text("开发进度")
+                            .font(.headline)
+                    }
 
-                StatusRow(icon: "circle",
-                         text: "公证自动化",
-                         status: .pending)
+                    StatusRow(icon: "checkmark.circle.fill",
+                             text: "Phase 0.5: 签名与公证",
+                             status: .completed)
+
+                    StatusRow(icon: "checkmark.circle.fill",
+                             text: "Phase 1 Day 1-3: 权限管理",
+                             status: .completed)
+
+                    StatusRow(icon: "circle.fill",
+                             text: "Phase 1 Day 4-5: 集成测试",
+                             status: .inProgress)
+
+                    StatusRow(icon: "circle",
+                             text: "Phase 1 Week 2: Pattern CLI",
+                             status: .pending)
+                }
+                .padding()
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(10)
+
+                Spacer()
             }
             .padding()
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(10)
+            .navigationTitle("MacCortex")
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button(action: {
+                        showSettings = true
+                    }) {
+                        Image(systemName: "gear")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(appState)
+        }
+    }
+}
+
+struct PermissionStatusRow: View {
+    let icon: String
+    let name: String
+    let isGranted: Bool
+    let isRequired: Bool
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundColor(isGranted ? .green : .orange)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(name)
+                        .font(.subheadline)
+
+                    if isRequired {
+                        Text("必需")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Color.red.opacity(0.2))
+                            .foregroundColor(.red)
+                            .cornerRadius(3)
+                    }
+                }
+
+                Text(isGranted ? "已授予" : "未授予")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             Spacer()
+
+            Image(systemName: isGranted ? "checkmark.circle.fill" : "xmark.circle")
+                .foregroundColor(isGranted ? .green : .orange)
         }
-        .padding()
     }
 }
 

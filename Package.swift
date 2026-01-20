@@ -59,5 +59,15 @@ let package = Package(
             ],
             path: "Tests/PermissionsKitTests"
         ),
+
+        // 应用层测试（Phase 1 Week 1 Day 5）
+        .testTarget(
+            name: "MacCortexAppTests",
+            dependencies: [
+                "MacCortexApp",
+                "PermissionsKit"
+            ],
+            path: "Tests/MacCortexAppTests"
+        ),
     ]
 )
