@@ -120,7 +120,7 @@
 
 ```mermaid
 graph TD
-    User((User)) -->|Hotkey Cmd+Space| InputLayer[感知层: Selection + Screen OCR + (Optional) Audio]
+    User((User)) -->|Hotkey Cmd+Space| InputLayer["感知层: Selection + Screen OCR + (Optional) Audio"]
 
     InputLayer --> Router{Intent Router + Risk Scoring}
 
@@ -137,7 +137,7 @@ graph TD
     FabricEngine -.->|Load| PatternLib[Local Patterns / Skills]
 
     %% 慢思考
-    Policy -->|Complex| SwarmEngine[Slow Lane: Orchestrator (LangGraph 或 claude-flow 适配层)]
+    Policy -->|Complex| SwarmEngine["Slow Lane: Orchestrator (LangGraph 或 claude-flow 适配层)"]
 
     subgraph SwarmTeam[Swarm Team]
         SwarmEngine --> Planner[Planner]
@@ -155,7 +155,7 @@ graph TD
     end
 
     subgraph Execution[执行层]
-        Shell[Shell/Python: Open Interpreter(或等价执行器)]
+        Shell["Shell/Python: Open Interpreter(或等价执行器)"]
         MacBridge[JXA/AppleScript/Shortcuts]
         MCP[MCP Client: tools/resources/prompts]
         Sandbox[Sandbox: container/VM/权限隔离]
