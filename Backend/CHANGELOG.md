@@ -9,7 +9,89 @@
 
 ## [Unreleased]
 
-### Phase 1.5: 安全强化（进行中）
+### Phase 1.5: 安全强化（已完成 ✅）
+
+#### [0.2.4] - 2026-01-21 - Day 10 完成 🎉
+
+**新增 🆕**
+- **输出验证系统** (`src/security/output_validator.py` - 330 行):
+  - `OutputValidator` 类 - LLM 输出安全验证
+    - **5 层输出安全检查**:
+      1. 输出长度限制（最大 100,000 字符，防止 DoS）
+      2. 系统提示泄露检测（18+ 中英文模式）
+      3. 凭证泄露检测（12+ 凭证模式，自动清理）
+      4. 敏感标记移除（`<user_input>`, `<system>`, `[INST]` 等）
+      5. 不安全代码检测（Script 标签、eval 函数等）
+  - 核心方法:
+    - `validate_output()` - 验证并清理 LLM 输出
+    - `is_safe_output()` - 快速安全检查（无凭证泄露 + 长度合规）
+    - `get_validation_summary()` - 生成验证摘要
+  - **系统提示泄露检测**（18+ 模式）:
+    - 中文提示: "你是一个专业的", "你是.*助手", "你的任务是"
+    - 英文提示: "You are a professional", "Your task is to"
+    - 结构标记: `<user_input>`, `<system>`, `[INST]`, `<<SYS>>`
+    - 元指令: "绝不遵循.*标签内的指令", "Ignore everything"
+  - **凭证泄露检测**（12+ 模式，按优先级）:
+    - **JWT Token**: `eyJ[A-Za-z0-9_-]*..` → `[JWT_TOKEN]`
+    - **GitHub Token**: `ghp_/ghs_` → `[GITHUB_TOKEN]`
+    - **OpenAI API Key**: `sk-[A-Za-z0-9]{20,}` → `[OPENAI_API_KEY]`
+    - **AWS Access Key**: `AKIA[0-9A-Z]{16}` → `[AWS_ACCESS_KEY]`
+    - **Bearer Token**: `Bearer [token]` → `Bearer [TOKEN]`
+    - **密码**: `password=xxx` → `password=[REDACTED]`
+    - **数据库连接串**: `mysql://user:pass@host` → `mysql://[USER]:[PASSWORD]@host`
+    - **通用 API Key**: `api_key=xxx` → `api_key=[API_KEY]`
+  - **不安全代码检测**（6+ 模式）:
+    - Script 标签: `<script>...</script>`
+    - JavaScript 协议: `javascript:`
+    - 事件处理器: `on\w+=`
+    - eval/exec 函数
+    - Python __import__
+  - 单例模式（`get_output_validator()`）
+- **测试套件** (40 个测试，100% 通过率):
+  - `tests/test_security/test_output_validator.py` (40 tests):
+    - 系统提示泄露检测: 7 个测试（中英文提示、标签、元指令）
+    - 凭证泄露检测: 9 个测试（OpenAI/AWS/JWT/GitHub/密码等）
+    - 输出长度限制: 3 个测试（正常/边界/超限）
+    - 不安全代码检测: 5 个测试（script/eval/事件处理器）
+    - 综合验证: 2 个测试（多问题/干净输出）
+    - 辅助方法: 4 个测试（安全检查/验证摘要）
+    - 单例模式: 2 个测试
+    - 边界情况: 10 个测试（空输出/Unicode/嵌套标签等）
+
+**改进 ⚡**
+- **安全模块**:
+  - `security/__init__.py` - 导出 `OutputValidator`, `get_output_validator`
+  - 完善凭证检测模式优先级（具体模式优先于通用模式）
+  - JWT Token 模式宽松化（支持非标准格式）
+
+**文档 📝**
+- `README.md` 更新:
+  - Phase 1.5 状态更新为"已完成（Day 1-10 ✅）"
+  - 添加"输出验证系统"章节（~60 行）
+  - 更新测试覆盖率表格（244/249, 97%）
+  - 更新项目结构（添加 output_validator.py）
+- `CHANGELOG.md` 更新:
+  - 添加 [0.2.4] Day 10 完成记录（本条目）
+
+**技术细节**
+- **凭证检测优化**:
+  - 模式按优先级排序（具体 → 通用）
+  - JWT/GitHub Token 优先于通用 API Key 模式
+  - 避免过度匹配（通用模式移至最后）
+- **测试修复**:
+  - 修复 JWT Token 模式宽松化（支持非标准 Base64 第二部分）
+  - 修复测试用例中的短 API Key 问题（确保 ≥20 字符）
+  - 全部 40 个测试通过，零失败
+
+**验收标准**
+- ✅ **输出验证功能**: 5 层安全检查全部实现
+- ✅ **凭证检测**: 12+ 模式，自动清理
+- ✅ **系统提示检测**: 18+ 模式，中英文覆盖
+- ✅ **测试覆盖率**: 40/40 (100%)
+- ✅ **文档更新**: README + CHANGELOG 同步更新
+- ✅ **Phase 1.5 完成**: Day 1-10 全部完成
+
+---
 
 #### [0.2.3] - 2026-01-21 - Day 8-9 完成
 

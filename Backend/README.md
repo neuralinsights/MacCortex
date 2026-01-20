@@ -1,6 +1,6 @@
 # MacCortex Python Backend
 
-**Phase 1 - 已完成** | **Phase 1.5 - 进行中（Day 1-9 已完成）**
+**Phase 1 - 已完成** | **Phase 1.5 - 已完成（Day 1-10 ✅）**
 **创建时间**: 2026-01-20 | **更新时间**: 2026-01-21
 
 AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持。
@@ -23,6 +23,7 @@ AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持�
 - ✅ **安全中间件**: 请求追踪 + IP 哈希（Day 4-5 已完成）
 - ✅ **输入验证**: 参数白名单 + 危险模式检测（Day 6-7 已完成）
 - ✅ **速率限制**: 令牌桶算法，60/min + 1000/hour（Day 8-9 已完成）
+- ✅ **输出验证**: 系统提示泄露检测 + 凭证清理（Day 10 已完成）
 
 ## 快速开始
 
@@ -173,7 +174,8 @@ Backend/
 │   │   ├── prompt_guard.py       # PromptGuard 核心（480 行）
 │   │   ├── audit_logger.py       # 审计日志系统（350 行，Day 4-5）
 │   │   ├── input_validator.py    # 输入验证器（280 行，Day 6-7）
-│   │   └── rate_limiter.py       # 速率限制器（310 行，Day 8-9）
+│   │   ├── rate_limiter.py       # 速率限制器（310 行，Day 8-9）
+│   │   └── output_validator.py   # 输出验证器（330 行，Day 10）
 │   ├── middleware/                # 中间件（Phase 1.5）
 │   │   ├── __init__.py
 │   │   ├── security_middleware.py    # 安全中间件（135 行，Day 4-5）
@@ -453,6 +455,66 @@ curl -i http://localhost:8000/execute -d '{...}'
 #   }
 ```
 
+### 输出验证系统（Day 10 已完成）
+
+MacCortex 实施了 LLM 输出安全验证，防止系统提示泄露、凭证泄露和敏感信息暴露。
+
+#### OutputValidator - 5 层输出安全检查
+```python
+from security.output_validator import get_output_validator
+
+validator = get_output_validator()
+
+# 验证并清理 LLM 输出
+output = "You are a professional assistant. API Key: sk-test123..."
+cleaned, warnings = validator.validate_output(output)
+
+# 清理结果
+# cleaned: "You are a professional assistant. API Key: [OPENAI_API_KEY]..."
+# warnings: [
+#   "潜在系统提示泄露: You are a professional assistant...",
+#   "检测到凭证泄露: sk-test123... (已清理)"
+# ]
+```
+
+**5 层输出安全检查**:
+1. ✅ **输出长度限制**: 最大 100,000 字符，防止 DoS 攻击
+2. ✅ **系统提示泄露检测**: 18+ 中英文模式（"你是一个专业的"、"You are a professional"）
+3. ✅ **凭证泄露检测**: 12+ 凭证模式，自动清理（OpenAI/AWS/JWT/GitHub Token）
+4. ✅ **敏感标记移除**: 清理 `<user_input>`, `<system>`, `[INST]` 等标记
+5. ✅ **不安全代码检测**: Script 标签、eval 函数、JavaScript 协议
+
+**凭证检测模式**（按优先级）:
+- **JWT Token**: `eyJ[A-Za-z0-9_-]*..` → `[JWT_TOKEN]`
+- **GitHub Token**: `ghp_/ghs_` → `[GITHUB_TOKEN]`
+- **OpenAI API Key**: `sk-[A-Za-z0-9]{20,}` → `[OPENAI_API_KEY]`
+- **AWS Access Key**: `AKIA[0-9A-Z]{16}` → `[AWS_ACCESS_KEY]`
+- **Bearer Token**: `Bearer [token]` → `Bearer [TOKEN]`
+- **密码**: `password=xxx` → `password=[REDACTED]`
+- **数据库连接串**: `mysql://user:pass@host` → `mysql://[USER]:[PASSWORD]@host`
+- **通用 API Key**: `api_key=xxx` → `api_key=[API_KEY]`
+
+**验证摘要生成**:
+```python
+# 获取验证摘要
+summary = validator.get_validation_summary(warnings)
+# → {
+#   "is_safe": False,
+#   "warning_count": 2,
+#   "has_prompt_leak": True,
+#   "has_credential_leak": True,
+#   "has_sensitive_markers": False,
+#   "has_unsafe_code": False
+# }
+```
+
+**快速安全检查**:
+```python
+# 快速检查是否安全（无凭证泄露 + 长度合规）
+is_safe = validator.is_safe_output(output)
+# → False（检测到凭证）
+```
+
 ### 安全 API 示例
 
 ```python
@@ -488,10 +550,11 @@ result = await pattern.execute(
 | **test_audit_logger.py** | 100% (36/36) | 审计日志系统（Day 4-5） |
 | **test_security_middleware.py** | 100% (17/17) | 安全中间件（Day 4-5） |
 | **test_input_validator.py** | 100% (50/50) | 输入验证系统（Day 6-7） |
-| **test_rate_limiter.py** | 100% (28/28) | 速率限制系统（Day 8-9） ⭐ |
+| **test_rate_limiter.py** | 100% (28/28) | 速率限制系统（Day 8-9） |
+| **test_output_validator.py** | 100% (40/40) | 输出验证系统（Day 10） ⭐ |
 | **test_phase1.5_integration.py** | 100% (30/30) | 所有 5 个 Pattern 集成 |
 | **test_all_patterns.py** | 100% (5/5) | 向后兼容性验证 |
-| **总体通过率** | **97% (214/219)** | **含 Day 8-9** |
+| **总体通过率** | **97% (244/249)** | **Phase 1.5 完成** ✅ |
 
 ### 性能开销
 

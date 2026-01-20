@@ -27,6 +27,7 @@ from .prompt_guard import (
 from .audit_logger import PIIRedactor, AuditLogger, get_audit_logger
 from .input_validator import InputValidator, get_input_validator
 from .rate_limiter import RateLimiter, TokenBucket, get_rate_limiter
+from .output_validator import OutputValidator, get_output_validator
 
 __all__ = [
     "SecurityConfig",
@@ -44,4 +45,6 @@ __all__ = [
     "RateLimiter",
     "TokenBucket",
     "get_rate_limiter",
+    "OutputValidator",
+    "get_output_validator",
 ]
