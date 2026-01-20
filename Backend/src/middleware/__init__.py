@@ -5,9 +5,10 @@
 
 """
 MacCortex Backend - 中间件模块
-Phase 1.5 - Day 4-5
+Phase 1.5 - Day 4-5 & Day 8-9
 """
 
 from .security_middleware import SecurityMiddleware
+from .rate_limit_middleware import RateLimitMiddleware
 
-__all__ = ["SecurityMiddleware"]
+__all__ = ["SecurityMiddleware", "RateLimitMiddleware"]

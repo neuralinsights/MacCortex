@@ -4,7 +4,7 @@
 MacCortex Python Backend - FastAPI Application
 Phase 1 - Week 2 Day 8-9
 创建时间: 2026-01-20
-更新时间: 2026-01-21 (Phase 1.5 - Day 6-7: 集成输入验证与参数白名单)
+更新时间: 2026-01-21 (Phase 1.5 - Day 8-9: 集成速率限制系统)
 
 FastAPI 服务，用于执行需要 Python 后端的 AI Pattern
 
@@ -45,6 +45,7 @@ from patterns.registry import PatternRegistry
 from utils.config import Settings
 from utils.watermark import verify_ownership, check_integrity, get_project_info
 from middleware.security_middleware import SecurityMiddleware  # Phase 1.5: 审计日志
+from middleware.rate_limit_middleware import RateLimitMiddleware  # Phase 1.5: 速率限制
 
 # 加载配置
 settings = Settings()
@@ -100,7 +101,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Phase 1.5: 安全中间件（审计日志 + 请求追踪）
+# Phase 1.5 Day 8-9: 速率限制中间件（60 req/min, 1000 req/hour）
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=60,
+    requests_per_hour=1000,
+    exempt_paths=["/health", "/version", "/docs", "/redoc", "/openapi.json"],
+)
+
+# Phase 1.5 Day 4-5: 安全中间件（审计日志 + 请求追踪）
 app.add_middleware(SecurityMiddleware, enable_audit_log=True)
 
 

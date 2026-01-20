@@ -1,6 +1,6 @@
 # MacCortex Python Backend
 
-**Phase 1 - 已完成** | **Phase 1.5 - 进行中（Day 1-7 已完成）**
+**Phase 1 - 已完成** | **Phase 1.5 - 进行中（Day 1-9 已完成）**
 **创建时间**: 2026-01-20 | **更新时间**: 2026-01-21
 
 AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持。
@@ -22,7 +22,7 @@ AI Pattern 执行引擎，为 MacCortex Swift 应用提供 Python 后端支持�
 - ✅ **审计日志**: PII 脱敏 + GDPR 合规（Day 4-5 已完成）
 - ✅ **安全中间件**: 请求追踪 + IP 哈希（Day 4-5 已完成）
 - ✅ **输入验证**: 参数白名单 + 危险模式检测（Day 6-7 已完成）
-- ⏳ **速率限制**: 60/min, 1000/hour（Day 8）
+- ✅ **速率限制**: 令牌桶算法，60/min + 1000/hour（Day 8-9 已完成）
 
 ## 快速开始
 
@@ -172,10 +172,12 @@ Backend/
 │   │   ├── security_config.py    # 安全配置（270 行）
 │   │   ├── prompt_guard.py       # PromptGuard 核心（480 行）
 │   │   ├── audit_logger.py       # 审计日志系统（350 行，Day 4-5）
-│   │   └── input_validator.py    # 输入验证器（280 行，Day 6-7）
+│   │   ├── input_validator.py    # 输入验证器（280 行，Day 6-7）
+│   │   └── rate_limiter.py       # 速率限制器（310 行，Day 8-9）
 │   ├── middleware/                # 中间件（Phase 1.5）
 │   │   ├── __init__.py
-│   │   └── security_middleware.py # 安全中间件（135 行，Day 4-5）
+│   │   ├── security_middleware.py    # 安全中间件（135 行，Day 4-5）
+│   │   └── rate_limit_middleware.py  # 速率限制中间件（145 行，Day 8-9）
 │   └── utils/                     # 工具模块
 │       ├── __init__.py
 │       ├── config.py             # 配置管理
@@ -376,6 +378,81 @@ class PatternRequest(BaseModel):
         return cleaned
 ```
 
+### 速率限制系统（Day 8-9 已完成）
+
+MacCortex 实施了基于令牌桶算法的速率限制，防止 DoS 攻击和资源滥用：
+
+#### RateLimiter - 令牌桶算法
+```python
+from security.rate_limiter import get_rate_limiter
+
+rate_limiter = get_rate_limiter(requests_per_minute=60, requests_per_hour=1000)
+
+# 检查速率限制
+allowed, error, retry_after = rate_limiter.check_rate_limit("client_ip")
+
+if not allowed:
+    # 超限拒绝
+    print(f"错误: {error}, 重试延迟: {retry_after} 秒")
+else:
+    # 允许请求
+    print("请求允许")
+
+# 获取剩余配额
+remaining = rate_limiter.get_remaining_requests("client_ip")
+# → {"per_minute": 55, "per_hour": 995}
+```
+
+**令牌桶核心特性**:
+- ✅ **双重限制**: 60 req/min（防止突发） + 1000 req/hour（防止持续滥用）
+- ✅ **令牌补充**: 自动补充（1 token/s 分钟桶，0.278 token/s 小时桶）
+- ✅ **线程安全**: 使用 `threading.Lock` 确保并发安全
+- ✅ **自动清理**: 定期清理过期客户端记录（5 分钟/2 小时未使用）
+- ✅ **配额查询**: 实时查询剩余请求数
+
+#### RateLimitMiddleware - FastAPI 集成
+```python
+from middleware.rate_limit_middleware import RateLimitMiddleware
+
+# 自动集成（main.py）
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=60,
+    requests_per_hour=1000,
+    exempt_paths=["/health", "/version", "/docs"]
+)
+```
+
+**中间件功能**:
+- ✅ **基于 IP 限制**: 自动提取客户端 IP（支持 X-Forwarded-For/X-Real-IP）
+- ✅ **429 响应**: 超限自动返回 429 Too Many Requests
+- ✅ **Retry-After 头**: 告知客户端等待时间
+- ✅ **X-RateLimit-* 头**: 配额信息响应头
+  - `X-RateLimit-Limit-Minute`: 每分钟限制
+  - `X-RateLimit-Limit-Hour`: 每小时限制
+  - `X-RateLimit-Remaining-Minute`: 剩余分钟配额
+  - `X-RateLimit-Remaining-Hour`: 剩余小时配额
+- ✅ **白名单路径**: `/health`, `/version`, `/docs` 等不受限制
+
+**速率限制响应示例**:
+```bash
+# 正常请求
+curl -i http://localhost:8000/execute -d '{...}'
+# → 200 OK
+# → X-RateLimit-Remaining-Minute: 59
+
+# 超限请求
+curl -i http://localhost:8000/execute -d '{...}'
+# → 429 Too Many Requests
+# → Retry-After: 12
+# → X-RateLimit-Remaining-Minute: 0
+# → {
+#     "detail": "速率限制超出（Too Many Requests）",
+#     "error": "速率限制：超过每分钟限制 (60 请求)",
+#     "retry_after": 12
+#   }
+```
+
 ### 安全 API 示例
 
 ```python
@@ -410,10 +487,11 @@ result = await pattern.execute(
 | **test_prompt_guard.py** | 87% (33/38) | PromptGuard 核心功能 |
 | **test_audit_logger.py** | 100% (36/36) | 审计日志系统（Day 4-5） |
 | **test_security_middleware.py** | 100% (17/17) | 安全中间件（Day 4-5） |
-| **test_input_validator.py** | 100% (50/50) | 输入验证系统（Day 6-7） ⭐ |
+| **test_input_validator.py** | 100% (50/50) | 输入验证系统（Day 6-7） |
+| **test_rate_limiter.py** | 100% (28/28) | 速率限制系统（Day 8-9） ⭐ |
 | **test_phase1.5_integration.py** | 100% (30/30) | 所有 5 个 Pattern 集成 |
 | **test_all_patterns.py** | 100% (5/5) | 向后兼容性验证 |
-| **总体通过率** | **97% (186/191)** | **含 Day 6-7** |
+| **总体通过率** | **97% (214/219)** | **含 Day 8-9** |
 
 ### 性能开销
 
