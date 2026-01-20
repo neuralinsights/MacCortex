@@ -4,15 +4,43 @@
 
 ## 项目状态
 
-🎉 **Phase 0.5: 签名与公证基础设施 - 已完成**（2026-01-20）
+### 🎉 Phase 1.5: Backend 安全强化 - 进行中（30% 完成）
+
+**已完成 Day 1-3**（2026-01-21）:
+- ✅ **PromptGuard 核心防护**: 5 层 Prompt Injection 防御体系
+- ✅ **26+ 恶意模式检测**: OWASP LLM01 防护
+- ✅ **所有 5 个 Pattern 集成**: 安全钩子自动化
+- ✅ **测试通过率**: 96% (52/55)
+- ✅ **性能开销**: < 10ms p95
+- ✅ **向后兼容**: 100%
+
+**进行中 Day 4-10**:
+- ⏳ 审计日志系统（PII 脱敏 + GDPR 合规）
+- ⏳ 输入验证与参数白名单
+- ⏳ 速率限制中间件（60/min, 1000/hour）
+- ⏳ OWASP 测试套件
+
+**目标**: 安全评分从 8/10 → 9/10
+
+---
+
+### ✅ Phase 1: Python Backend - 已完成（2026-01-20）
+
+- ✅ **5 个核心 Pattern**: Summarize, Extract, Translate, Format, Search
+- ✅ **FastAPI 服务**: 高性能 REST API
+- ✅ **MLX/Ollama 集成**: Apple Silicon 优化
+- ✅ **版权保护系统**: 水印 + 审计
+- ✅ **测试覆盖**: 所有 Pattern 功能验证
+
+---
+
+### ✅ Phase 0.5: 签名与公证基础设施 - 已完成（2026-01-20）
 
 - ✅ Developer ID 签名 + Hardened Runtime
 - ✅ Apple 公证自动化（xcrun notarytool）
 - ✅ Full Disk Access 权限管理基础设施
 - ✅ Sparkle 2 自动更新集成
 - ✅ 技术成熟度评分：9.0/10
-
-**下一步**: Phase 1（权限管理 UI + Pattern CLI + Python 后端）- 预计 2 周
 
 ## 快速开始
 
@@ -46,7 +74,44 @@ open build/MacCortex.app
 
 **完整设置指南**: 参见 [Docs/setup-checklist.md](Docs/setup-checklist.md)
 
-## Phase 0.5 验收结果
+## 验收结果
+
+### Phase 1.5 验收进度（Day 1-3）
+
+| # | 验收项 | 状态 | 进度 | 说明 |
+|---|--------|------|------|------|
+| 1 | **OWASP LLM01 防御** | 🟡 进行中 | 85% | 5 层防护体系运行正常 |
+| 2 | 审计日志完整性 | ⏸️ 待开始 | 0% | Day 4-5 实施 |
+| 3 | PII 脱敏 | ⏸️ 待开始 | 0% | 15+ 模式待实施 |
+| 4 | 参数白名单 | ⏸️ 待开始 | 0% | Day 6-7 实施 |
+| 5 | 速率限制 | ⏸️ 待开始 | 0% | 60/min, 1000/hour |
+| 6 | **性能开销** | ✅ 通过 | 100% | < 10ms p95 ✅ |
+| 7 | **向后兼容** | ✅ 通过 | 100% | 所有现有测试通过 ✅ |
+| 8 | 测试覆盖率 | 🟡 进行中 | 85% | 96% 通过率 (52/55) |
+
+**总体进度**: 30%（Day 1-3 已完成，Day 4-10 待实施）
+
+详细报告：[Backend/PHASE_1.5_DAY1-3_SUMMARY.md](Backend/PHASE_1.5_DAY1-3_SUMMARY.md)
+
+---
+
+### Phase 1 验收结果（Backend）
+
+| # | 验收项 | 状态 | 结果 |
+|---|--------|------|------|
+| 1 | 5 个 Pattern 实现 | ✅ | Summarize, Extract, Translate, Format, Search |
+| 2 | FastAPI 服务 | ✅ | REST API + Swagger 文档 |
+| 3 | MLX/Ollama 集成 | ✅ | Apple Silicon 优化 + 回退机制 |
+| 4 | 版权保护 | ✅ | 水印 + 审计日志 |
+| 5 | 测试验证 | ✅ | 所有 Pattern 功能测试通过 |
+
+**通过率**: 100%（5/5 项）
+
+详细文档：[Backend/README.md](Backend/README.md)
+
+---
+
+### Phase 0.5 验收结果（签名与公证）
 
 | # | 验收项 | 状态 | 结果 |
 |---|--------|------|------|
@@ -70,6 +135,23 @@ MacCortex/
 │   ├── MacCortexApp/    # 主应用（SwiftUI）
 │   ├── PermissionsKit/  # 权限管理
 │   └── PythonBridge/    # Swift ↔ Python 桥接
+├── Backend/             # Python 后端（Phase 1 ✅ + Phase 1.5 🚧）
+│   ├── src/
+│   │   ├── main.py                 # FastAPI 应用
+│   │   ├── patterns/               # 5 个 AI Pattern（已完成）
+│   │   │   ├── summarize.py       # 文本总结
+│   │   │   ├── extract.py         # 信息提取
+│   │   │   ├── translate.py       # 文本翻译
+│   │   │   ├── format.py          # 格式转换
+│   │   │   └── search.py          # 网络搜索
+│   │   ├── security/               # 安全模块（Phase 1.5）
+│   │   │   ├── security_config.py # 配置（270 行）
+│   │   │   └── prompt_guard.py    # 5 层防护（480 行）
+│   │   └── utils/                  # 工具模块
+│   ├── tests/                      # 测试套件
+│   ├── README.md                   # Backend 文档
+│   ├── CHANGELOG.md                # 变更日志
+│   └── PHASE_1.5_DAY1-3_SUMMARY.md # 安全强化总结
 ├── Scripts/             # 构建脚本
 │   ├── sign.sh          # 代码签名
 │   ├── notarize.sh      # 公证
@@ -77,25 +159,43 @@ MacCortex/
 ├── Resources/           # 资源文件
 │   ├── Entitlements/    # Hardened Runtime 配置
 │   └── Info.plist       # 应用元信息
-├── Backend/             # Python 后端（Phase 1+）
+├── Docs/                # 项目文档
 └── RaycastExtension/    # Raycast 扩展（Phase 1 快速验证）
 ```
 
 ## 技术栈
 
+### Frontend（macOS 应用）
 - **GUI**: SwiftUI (macOS 14+)
 - **权限管理**: FullDiskAccess.swift + TCC
 - **签名与公证**: Developer ID + xcrun notarytool
 - **自动更新**: Sparkle 2 (EdDSA)
-- **后端**: Python + LangGraph + MLX/Ollama (Phase 1+)
+
+### Backend（Python 后端）✅
+- **Web 框架**: FastAPI 0.109.0
+- **数据验证**: Pydantic 2.5.0
+- **LLM 推理**: MLX 0.5.0（Apple Silicon 优化）/ Ollama 0.1.6
+- **日志**: Loguru 0.7.2
+- **测试**: Pytest 8.3.4
+
+### Phase 1.5: 安全模块 🔒
+- **Prompt Injection 防护**: PromptGuard（5 层防御）
+- **恶意检测**: 26+ 正则表达式模式
+- **输入标记**: XML 标签隔离
+- **输出清理**: 敏感信息过滤
 
 ## 文档
 
 ### 核心文档
 - [架构设计](README_ARCH.md) - 完整的系统架构与设计决策（v1.1）
+- [Backend README](Backend/README.md) - Python 后端文档（Phase 1 + 1.5）
+- [Backend CHANGELOG](Backend/CHANGELOG.md) - 后端变更日志
+
+### Phase 总结报告
+- [Phase 1.5 Day 1-3 总结](Backend/PHASE_1.5_DAY1-3_SUMMARY.md) - 安全强化完成报告（30%）
 - [Phase 0.5 总结](Docs/Phase-0.5-Summary.md) - 签名与公证基础设施完整报告
 
-### 验收报告
+### Phase 0.5 验收报告
 - [Day 2: Hardened Runtime + Entitlements](Docs/Day2-Verification-Report.md)
 - [Day 3: 代码签名脚本](Docs/Day3-Verification-Report.md)
 - [Day 4: Apple 公证自动化](Docs/Day4-Verification-Report.md)
@@ -117,13 +217,30 @@ MacCortex 正在积极开发中。欢迎贡献代码、报告问题或提出建�
 
 ## 关键指标
 
+### 项目总体
 - **创建时间**: 2026-01-20
-- **当前版本**: v0.5.0
-- **Phase**: 0.5 ✅ 完成 → Phase 1 准备中
-- **公证成功率**: 100% (2/2)
-- **平均公证时间**: ~2 分钟
+- **最后更新**: 2026-01-21
+- **当前版本**: v0.5.1 (Backend v0.2.0)
+- **Phase 进度**:
+  - Phase 0.5 ✅ 完成
+  - Phase 1 ✅ 完成
+  - Phase 1.5 🚧 进行中（30% 完成，Day 1-3 已完成）
 - **技术成熟度**: 9.0/10
-- **文档完整性**: 130 KB（14 个文件）
+- **文档完整性**: 180+ KB（20+ 个文件）
+
+### Backend 指标（Phase 1.5）
+- **Pattern 数量**: 5 个（全部集成安全防护）
+- **测试通过率**: 96% (52/55)
+- **安全评分**: 7.5/10 → 目标 9/10
+- **性能开销**: < 10ms p95
+- **代码行数**: 2,000+ 行（含安全模块）
+
+### 安全指标
+- **OWASP LLM01 防御率**: 85%
+- **恶意模式检测**: 26+ 模式
+- **向后兼容性**: 100%
+- **PII 脱敏**: 待实施（Day 4-5）
+- **速率限制**: 待实施（Day 8）
 
 ## 关键配置
 
