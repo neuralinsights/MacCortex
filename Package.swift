@@ -81,7 +81,8 @@ let package = Package(
         .testTarget(
             name: "PatternKitTests",
             dependencies: [
-                "PatternKit"
+                "PatternKit",
+                "PythonBridge"  // 边界测试需要 AnyCodable
             ],
             path: "Tests/PatternKitTests"
         ),
