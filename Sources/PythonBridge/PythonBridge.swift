@@ -50,6 +50,128 @@ public struct PythonRequest: Codable {
         self.parameters = parameters
         self.requestID = requestID
     }
+
+    // MARK: - Codable
+
+    enum CodingKeys: String, CodingKey {
+        case patternID = "pattern_id"
+        case text
+        case parameters
+        case requestID = "request_id"
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(patternID, forKey: .patternID)
+        try container.encode(text, forKey: .text)
+        try container.encode(requestID, forKey: .requestID)
+
+        // 自定义编码 parameters：展开 AnyCodable 的值
+        // 将 [String: AnyCodable] 转换为原始值的字典
+        let unwrappedParameters = parameters.mapValues { $0.value }
+
+        // 使用临时结构体来编码 Any 类型的字典
+        let parametersWrapper = AnyCodableDict(unwrappedParameters)
+        try container.encode(parametersWrapper, forKey: .parameters)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.patternID = try container.decode(String.self, forKey: .patternID)
+        self.text = try container.decode(String.self, forKey: .text)
+        self.requestID = try container.decode(String.self, forKey: .requestID)
+        self.parameters = try container.decode([String: AnyCodable].self, forKey: .parameters)
+    }
+}
+
+// AnyCodable 字典包装器（用于编码 [String: Any]）
+private struct AnyCodableDict: Encodable {
+    let dict: [String: Any]
+
+    init(_ dict: [String: Any]) {
+        self.dict = dict
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: DynamicCodingKey.self)
+
+        for (key, value) in dict {
+            guard let codingKey = DynamicCodingKey(stringValue: key) else {
+                continue
+            }
+
+            // 根据值的类型进行编码
+            switch value {
+            case let string as String:
+                try container.encode(string, forKey: codingKey)
+            case let int as Int:
+                try container.encode(int, forKey: codingKey)
+            case let double as Double:
+                try container.encode(double, forKey: codingKey)
+            case let bool as Bool:
+                try container.encode(bool, forKey: codingKey)
+            case let array as [Any]:
+                let wrapper = AnyArray(array)
+                try container.encode(wrapper, forKey: codingKey)
+            case let dict as [String: Any]:
+                let wrapper = AnyCodableDict(dict)
+                try container.encode(wrapper, forKey: codingKey)
+            default:
+                // 尝试使用 nil（忽略不支持的类型）
+                try container.encodeNil(forKey: codingKey)
+            }
+        }
+    }
+}
+
+// Any 数组包装器
+private struct AnyArray: Encodable {
+    let array: [Any]
+
+    init(_ array: [Any]) {
+        self.array = array
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+
+        for value in array {
+            switch value {
+            case let string as String:
+                try container.encode(string)
+            case let int as Int:
+                try container.encode(int)
+            case let double as Double:
+                try container.encode(double)
+            case let bool as Bool:
+                try container.encode(bool)
+            case let array as [Any]:
+                let wrapper = AnyArray(array)
+                try container.encode(wrapper)
+            case let dict as [String: Any]:
+                let wrapper = AnyCodableDict(dict)
+                try container.encode(wrapper)
+            default:
+                try container.encodeNil()
+            }
+        }
+    }
+}
+
+// 动态 CodingKey（用于编码字典）
+private struct DynamicCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
 }
 
 /// Python 响应
@@ -71,6 +193,17 @@ public struct PythonResponse: Codable {
 
     /// 执行时间（秒）
     public let duration: Double
+
+    // MARK: - Codable
+
+    enum CodingKeys: String, CodingKey {
+        case requestID = "request_id"
+        case success
+        case output
+        case metadata
+        case error
+        case duration
+    }
 }
 
 /// Python 桥接管理器
