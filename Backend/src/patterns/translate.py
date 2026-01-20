@@ -1,3 +1,8 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Copyright (c) 2026 Yu Geng. All rights reserved.
+# MacCortex - Proprietary and Confidential
+
 # MacCortex TranslatePattern - 翻译模式
 # Phase 1 - Week 2 Day 9
 # 创建时间: 2026-01-20

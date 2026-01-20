@@ -1,3 +1,14 @@
+//
+// MacCortex - Next-Generation macOS Personal Intelligence Infrastructure
+// Copyright (c) 2026 Yu Geng. All rights reserved.
+//
+// This source code is proprietary and confidential.
+// Unauthorized copying, distribution, or use is strictly prohibited.
+//
+// Author: Yu Geng <james.geng@gmail.com>
+// License: Proprietary
+//
+
 // MacCortex PermissionsKit - Accessibility 权限管理
 // Phase 1 - Week 1 Day 1-2
 // 创建时间: 2026-01-20

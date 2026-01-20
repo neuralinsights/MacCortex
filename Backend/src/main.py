@@ -1,10 +1,27 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 MacCortex Python Backend - FastAPI Application
 Phase 1 - Week 2 Day 8-9
 创建时间: 2026-01-20
 
 FastAPI 服务，用于执行需要 Python 后端的 AI Pattern
+
+Copyright (c) 2026 Yu Geng. All rights reserved.
+This software is proprietary and confidential.
 """
+
+__author__ = "Yu Geng"
+__copyright__ = "Copyright 2026, Yu Geng"
+__license__ = "Proprietary"
+__version__ = "1.0.0"
+__maintainer__ = "Yu Geng"
+__email__ = "james.geng@gmail.com"
+__status__ = "Production"
+
+# Project watermark (DO NOT REMOVE)
+_PROJECT_ID = "MacCortex-YG-2026-0121-PROD"
+_OWNER_HASH = "8f3b5c7a9e1d2f4b6a8c0e3f5d7b9a1c3e5f7d9b"  # Hidden identifier
 
 import os
 import sys
@@ -24,9 +41,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from patterns.registry import PatternRegistry
 from utils.config import Settings
+from utils.watermark import verify_ownership, check_integrity, get_project_info
 
 # 加载配置
 settings = Settings()
+
+# 验证项目所有权（静默）
+_ownership_verified = verify_ownership()
+_integrity_checked = check_integrity()
 
 # 配置日志
 logger.remove()
@@ -208,6 +230,26 @@ async def get_version():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
+
+
+@app.get("/copyright", summary="Copyright information")
+async def get_copyright():
+    """
+    获取版权信息
+
+    Copyright (c) 2026 Yu Geng. All rights reserved.
+    """
+    project_info = get_project_info()
+    return {
+        "copyright": "Copyright (c) 2026 Yu Geng. All rights reserved.",
+        "project": "MacCortex - Next-Generation macOS Personal Intelligence Infrastructure",
+        "owner": "Yu Geng",
+        "email": "james.geng@gmail.com",
+        "license": "Proprietary",
+        "watermark": project_info.get("watermark"),
+        "verified": project_info.get("verified"),
+        "warning": "This software is proprietary and confidential. Unauthorized use is prohibited.",
+    }
 
 
 @app.post("/execute", response_model=PatternResponse, summary="Execute pattern")
