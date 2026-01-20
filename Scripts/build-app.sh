@@ -43,12 +43,15 @@ mkdir -p "$OUTPUT_DIR"
 echo -e "${YELLOW}[2/6]${NC} 使用 SPM 构建可执行文件..."
 cd "$PROJECT_ROOT"
 
+# 添加 linker 标志以设置正确的 @rpath
+LINKER_FLAGS="-Xlinker -rpath -Xlinker @loader_path/../Frameworks"
+
 if [ "$BUILD_CONFIG" = "release" ]; then
-    swift build --configuration release
-    echo "  ✓ Release 构建完成"
+    swift build --configuration release $LINKER_FLAGS
+    echo "  ✓ Release 构建完成（已配置 @rpath）"
 else
-    swift build --configuration debug
-    echo "  ✓ Debug 构建完成"
+    swift build --configuration debug $LINKER_FLAGS
+    echo "  ✓ Debug 构建完成（已配置 @rpath）"
 fi
 
 # Step 3: 创建 .app bundle 结构
@@ -81,6 +84,18 @@ if [ -d "$BUILD_DIR/Sparkle.framework" ]; then
     echo "  ✓ Sparkle.framework 已复制: $(du -sh "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" | awk '{print $1}')"
 else
     echo -e "  ${YELLOW}⚠ Sparkle.framework 未找到（正常，将在 Day 10 集成）${NC}"
+fi
+
+# Step 6.5: 验证 @rpath 配置
+echo ""
+echo -e "${YELLOW}[验证]${NC} 检查 @rpath 配置..."
+if otool -l "$APP_BUNDLE/Contents/MacOS/$APP_NAME" | grep -q "@loader_path/../Frameworks"; then
+    echo "  ✓ @rpath 配置正确"
+else
+    echo -e "  ${RED}✗ @rpath 配置缺失！${NC}"
+    echo "  正在添加 @rpath..."
+    install_name_tool -add_rpath "@loader_path/../Frameworks" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+    echo "  ✓ @rpath 已修复"
 fi
 
 # 验证 .app bundle 结构
