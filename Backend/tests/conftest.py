@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-pytest 配置文件
-用于设置测试环境
+# Copyright (c) 2026 Yu Geng. All rights reserved.
+# MacCortex - Proprietary and Confidential
 
-Copyright (c) 2026 Yu Geng. All rights reserved.
+"""
+MacCortex Backend - Pytest 配置
+Phase 1.5 - Day 4-5
+
+自动添加 src/ 到 Python 路径
 """
 
 import sys
-import os
+from pathlib import Path
 
-# 添加 src 目录到 Python 路径
-src_path = os.path.join(os.path.dirname(__file__), "../src")
-sys.path.insert(0, os.path.abspath(src_path))
+# 添加 Backend/src 到 Python 路径
+backend_root = Path(__file__).parent.parent
+src_path = backend_root / "src"
+src_path_str = str(src_path.absolute())
+
+if src_path_str not in sys.path:
+    sys.path.insert(0, src_path_str)

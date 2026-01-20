@@ -24,6 +24,7 @@ from .prompt_guard import (
     quick_check,
     protect_prompt,
 )
+from .audit_logger import PIIRedactor, AuditLogger, get_audit_logger
 
 __all__ = [
     "SecurityConfig",
@@ -33,4 +34,7 @@ __all__ = [
     "get_prompt_guard",
     "quick_check",
     "protect_prompt",
+    "PIIRedactor",
+    "AuditLogger",
+    "get_audit_logger",
 ]

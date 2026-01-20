@@ -4,6 +4,7 @@
 MacCortex Python Backend - FastAPI Application
 Phase 1 - Week 2 Day 8-9
 创建时间: 2026-01-20
+更新时间: 2026-01-21 (Phase 1.5 - Day 4-5: 集成审计日志系统)
 
 FastAPI 服务，用于执行需要 Python 后端的 AI Pattern
 
@@ -42,6 +43,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from patterns.registry import PatternRegistry
 from utils.config import Settings
 from utils.watermark import verify_ownership, check_integrity, get_project_info
+from middleware.security_middleware import SecurityMiddleware  # Phase 1.5: 审计日志
 
 # 加载配置
 settings = Settings()
@@ -96,6 +98,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Phase 1.5: 安全中间件（审计日志 + 请求追踪）
+app.add_middleware(SecurityMiddleware, enable_audit_log=True)
 
 
 # ==================== Pydantic 模型 ====================
@@ -254,8 +259,12 @@ async def get_copyright():
 
 @app.post("/execute", response_model=PatternResponse, summary="Execute pattern")
 async def execute_pattern(request: PatternRequest):
-    """执行 AI Pattern"""
+    """执行 AI Pattern（Phase 1.5: 含审计日志）"""
     start_time = datetime.now()
+
+    # Phase 1.5: 获取审计日志器
+    from security.audit_logger import get_audit_logger
+    audit_logger = get_audit_logger()
 
     try:
         logger.info(f"📥 收到请求: pattern={request.pattern_id}, request_id={request.request_id}")
@@ -273,6 +282,24 @@ async def execute_pattern(request: PatternRequest):
 
         logger.info(f"✅ 执行成功: duration={duration:.2f}s")
 
+        # Phase 1.5: 记录 Pattern 执行
+        security_flags = []
+        metadata = result.get("metadata", {})
+        if isinstance(metadata, dict) and "security" in metadata:
+            security_info = metadata["security"]
+            if security_info.get("injection_detected"):
+                security_flags.append("injection_detected")
+
+        audit_logger.log_pattern_execution(
+            request_id=request.request_id,
+            pattern_id=request.pattern_id,
+            input_length=len(request.text),
+            output_length=len(result["output"]) if result["output"] else 0,
+            duration_ms=duration * 1000,
+            success=True,
+            security_flags=security_flags,
+        )
+
         return PatternResponse(
             request_id=request.request_id,
             success=True,
@@ -286,6 +313,17 @@ async def execute_pattern(request: PatternRequest):
         # Pattern 不存在或参数无效
         logger.warning(f"⚠️ 请求无效: {e}")
         duration = (datetime.now() - start_time).total_seconds()
+
+        # Phase 1.5: 记录失败
+        audit_logger.log_pattern_execution(
+            request_id=request.request_id,
+            pattern_id=request.pattern_id,
+            input_length=len(request.text),
+            output_length=0,
+            duration_ms=duration * 1000,
+            success=False,
+        )
+
         return PatternResponse(
             request_id=request.request_id,
             success=False,
@@ -299,6 +337,18 @@ async def execute_pattern(request: PatternRequest):
         # 执行失败
         logger.error(f"❌ 执行失败: {e}")
         duration = (datetime.now() - start_time).total_seconds()
+
+        # Phase 1.5: 记录异常
+        audit_logger.log_security_event(
+            request_id=request.request_id,
+            event_subtype="pattern_error",
+            severity="high",
+            details={
+                "pattern_id": request.pattern_id,
+                "error": str(e),
+            },
+        )
+
         return PatternResponse(
             request_id=request.request_id,
             success=False,
