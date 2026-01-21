@@ -11,7 +11,7 @@ import sys
 import json
 import re
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -36,7 +36,8 @@ class ReviewerNode:
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.0,
         timeout: int = 30,
-        max_iterations: int = 3
+        max_iterations: int = 3,
+        llm: Optional[Any] = None
     ):
         """
         初始化 Reviewer Node
@@ -47,16 +48,21 @@ class ReviewerNode:
             temperature: 温度参数（0.0 为审查推荐值，确保一致性）
             timeout: 代码执行超时时间（秒）
             max_iterations: 最大迭代次数（防止无限循环）
+            llm: 可选的 LLM 实例（用于测试时依赖注入）
         """
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+        # 使用注入的 LLM 或创建新的 LLM
+        if llm is not None:
+            self.llm = llm
+        else:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
 
-        self.llm = ChatAnthropic(
-            model=model,
-            temperature=temperature,
-            anthropic_api_key=api_key
-        )
+            self.llm = ChatAnthropic(
+                model=model,
+                temperature=temperature,
+                anthropic_api_key=api_key
+            )
         self.workspace = Path(workspace_path)
         self.timeout = timeout
         self.max_iterations = max_iterations
@@ -353,6 +359,29 @@ class ReviewerNode:
                 "passed": False,
                 "feedback": f"LLM 响应解析失败: {e}\n原始响应:\n{content[:200]}"
             }
+
+
+def create_reviewer_node(
+    workspace_path: Path,
+    **kwargs
+) -> callable:
+    """
+    创建 Reviewer 节点（用于 LangGraph）
+
+    Args:
+        workspace_path: 工作空间路径
+        **kwargs: 传递给 ReviewerNode 的参数
+
+    Returns:
+        Reviewer 节点函数
+    """
+    reviewer = ReviewerNode(workspace_path, **kwargs)
+
+    async def reviewer_node(state: SwarmState) -> SwarmState:
+        """Reviewer 节点函数"""
+        return await reviewer.review(state)
+
+    return reviewer_node
 
 
 # 用于测试的简化函数

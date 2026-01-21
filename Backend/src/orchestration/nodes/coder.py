@@ -30,7 +30,8 @@ class CoderNode:
         self,
         workspace_path: Path,
         model: str = "claude-sonnet-4-20250514",
-        temperature: float = 0.3
+        temperature: float = 0.3,
+        llm: Optional[Any] = None
     ):
         """
         初始化 Coder Node
@@ -39,16 +40,21 @@ class CoderNode:
             workspace_path: 工作空间路径（用于写入生成的代码）
             model: Claude 模型名称
             temperature: 温度参数（0.3 为代码生成推荐值）
+            llm: 可选的 LLM 实例（用于测试时依赖注入）
         """
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+        # 使用注入的 LLM 或创建新的 LLM
+        if llm is not None:
+            self.llm = llm
+        else:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
 
-        self.llm = ChatAnthropic(
-            model=model,
-            temperature=temperature,
-            anthropic_api_key=api_key
-        )
+            self.llm = ChatAnthropic(
+                model=model,
+                temperature=temperature,
+                anthropic_api_key=api_key
+            )
         self.workspace = Path(workspace_path)
         self.workspace.mkdir(parents=True, exist_ok=True)
 
@@ -263,6 +269,29 @@ if __name__ == "__main__":
             文件路径列表
         """
         return sorted(self.workspace.glob("subtask_*"))
+
+
+def create_coder_node(
+    workspace_path: Path,
+    **kwargs
+) -> callable:
+    """
+    创建 Coder 节点（用于 LangGraph）
+
+    Args:
+        workspace_path: 工作空间路径
+        **kwargs: 传递给 CoderNode 的参数
+
+    Returns:
+        Coder 节点函数
+    """
+    coder = CoderNode(workspace_path, **kwargs)
+
+    async def coder_node(state: SwarmState) -> SwarmState:
+        """Coder 节点函数"""
+        return await coder.code(state)
+
+    return coder_node
 
 
 # 用于测试的简化函数

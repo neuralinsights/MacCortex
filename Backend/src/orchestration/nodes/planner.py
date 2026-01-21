@@ -31,7 +31,8 @@ class PlannerNode:
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.2,
         max_subtasks: int = 10,
-        min_subtasks: int = 3
+        min_subtasks: int = 3,
+        llm: Optional[Any] = None
     ):
         """
         初始化 Planner Node
@@ -41,17 +42,22 @@ class PlannerNode:
             temperature: 温度参数（0.2 更确定性，适合任务拆解）
             max_subtasks: 最大子任务数量
             min_subtasks: 最小子任务数量
+            llm: 可选的 LLM 实例（用于测试时依赖注入）
         """
-        # 检查 API Key
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+        # 使用注入的 LLM 或创建新的 LLM
+        if llm is not None:
+            self.llm = llm
+        else:
+            # 检查 API Key
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
 
-        self.llm = ChatAnthropic(
-            model=model,
-            temperature=temperature,
-            anthropic_api_key=api_key
-        )
+            self.llm = ChatAnthropic(
+                model=model,
+                temperature=temperature,
+                anthropic_api_key=api_key
+            )
         self.max_subtasks = max_subtasks
         self.min_subtasks = min_subtasks
 
@@ -362,6 +368,29 @@ class PlannerNode:
 
         if not plan["overall_acceptance"]:
             raise ValueError("缺少整体验收标准")
+
+
+def create_planner_node(
+    workspace_path: Path,
+    **kwargs
+) -> callable:
+    """
+    创建 Planner 节点（用于 LangGraph）
+
+    Args:
+        workspace_path: 工作空间路径
+        **kwargs: 传递给 PlannerNode 的参数
+
+    Returns:
+        Planner 节点函数
+    """
+    planner = PlannerNode(**kwargs)
+
+    async def planner_node(state: SwarmState) -> SwarmState:
+        """Planner 节点函数"""
+        return await planner.plan(state)
+
+    return planner_node
 
 
 # 便捷函数：用于测试

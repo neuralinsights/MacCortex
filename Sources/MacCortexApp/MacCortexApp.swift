@@ -41,6 +41,18 @@ struct MacCortexApp: App {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             GlobalHotKeyManager.shared.registerHotKeys()
         }
+
+        // Phase 3 Week 4 Day 5: 设置通知权限和类别
+        Task { @MainActor in
+            // 延迟 1.5 秒，等待应用完全启动后再请求通知权限
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+
+            // 设置通知类别（支持交互式操作）
+            NotificationManager.shared.setupNotificationCategories()
+
+            // 请求通知权限
+            try? await NotificationManager.shared.requestAuthorization()
+        }
     }
 
     var body: some Scene {

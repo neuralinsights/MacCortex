@@ -115,19 +115,21 @@ class StopConditionChecker:
 
 
 def create_stop_condition_node(
-    checker: Optional[StopConditionChecker] = None
+    checker: Optional[StopConditionChecker] = None,
+    **kwargs
 ) -> callable:
     """
     创建停止条件检查节点（用于 LangGraph）
 
     Args:
         checker: StopConditionChecker 实例（如果为 None，使用默认配置）
+        **kwargs: 传递给 StopConditionChecker 的参数（如 max_iterations, max_tokens）
 
     Returns:
         停止条件检查节点函数
     """
     if checker is None:
-        checker = StopConditionChecker()
+        checker = StopConditionChecker(**kwargs)
 
     def stop_condition_node(state: SwarmState) -> SwarmState:
         """

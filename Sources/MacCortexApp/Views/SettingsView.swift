@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 /// 偏好设置视图
 ///
@@ -393,7 +394,7 @@ struct AdvancedSettingsView: View {
         panel.allowsMultipleSelection = false
 
         if panel.runModal() == .OK, let url = panel.url {
-            settings.import(from: url)
+            settings.importSettings(from: url)
         }
     }
 }
@@ -569,14 +570,243 @@ class SettingsManager: ObservableObject {
 
     /// 导出设置到 JSON
     func export(to url: URL) {
-        // TODO: 实现设置导出
-        print("[Settings] 导出设置到: \(url)")
+        do {
+            // 构建设置字典
+            let settings: [String: Any] = [
+                // 通用设置
+                "defaultSourceLanguage": defaultSourceLanguage.rawValue,
+                "defaultTargetLanguage": defaultTargetLanguage.rawValue,
+                "defaultStyle": defaultStyle.rawValue,
+                "defaultUseStreaming": defaultUseStreaming,
+                "autoSaveHistory": autoSaveHistory,
+                "showMainWindowOnLaunch": showMainWindowOnLaunch,
+                "appTheme": appTheme.rawValue,
+
+                // 剪贴板设置
+                "clipboardMonitorEnabled": clipboardMonitorEnabled,
+                "clipboardMinimumLength": clipboardMinimumLength,
+                "clipboardPollingInterval": clipboardPollingInterval,
+                "clipboardExcludeURLs": clipboardExcludeURLs,
+                "clipboardExcludeNumbers": clipboardExcludeNumbers,
+                "clipboardExcludeCode": clipboardExcludeCode,
+                "clipboardMaxLength": clipboardMaxLength,
+                "clipboardAutoCopyResult": clipboardAutoCopyResult,
+                "clipboardShowNotification": clipboardShowNotification,
+
+                // 快捷键设置
+                "globalHotKeyEnabled": globalHotKeyEnabled,
+                "floatingPanelModifiers": floatingPanelModifiers,
+                "floatingPanelKey": floatingPanelKey,
+
+                // 高级设置
+                "backendURL": backendURL,
+                "backendTimeout": backendTimeout,
+                "cacheSize": cacheSize,
+                "cacheTTL": cacheTTL,
+                "enableDebugLogging": enableDebugLogging,
+                "showAPIResponseTime": showAPIResponseTime,
+
+                // 元数据
+                "exportVersion": "1.0",
+                "exportDate": ISO8601DateFormatter().string(from: Date()),
+                "appVersion": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+            ]
+
+            // 转换为 JSON
+            let jsonData = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
+
+            // 写入文件
+            try jsonData.write(to: url)
+
+            print("[Settings] ✅ 设置导出成功: \(url.path)")
+
+            // 显示成功通知
+            showExportSuccessNotification()
+        } catch {
+            print("[Settings] ❌ 设置导出失败: \(error)")
+            showExportErrorAlert(error: error)
+        }
     }
 
     /// 从 JSON 导入设置
-    func `import`(from url: URL) {
-        // TODO: 实现设置导入
-        print("[Settings] 从导入设置: \(url)")
+    func importSettings(from url: URL) {
+        do {
+            // 读取文件
+            let jsonData = try Data(contentsOf: url)
+
+            // 解析 JSON
+            guard let settings = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                throw SettingsError.invalidFormat
+            }
+
+            // 验证版本
+            guard let version = settings["exportVersion"] as? String,
+                  version == "1.0" else {
+                throw SettingsError.unsupportedVersion
+            }
+
+            // 导入设置（避免触发 didSet，直接使用 UserDefaults）
+            let defaults = UserDefaults.standard
+
+            // 通用设置
+            if let value = settings["defaultSourceLanguage"] as? String {
+                defaults.set(value, forKey: "defaultSourceLanguage")
+            }
+            if let value = settings["defaultTargetLanguage"] as? String {
+                defaults.set(value, forKey: "defaultTargetLanguage")
+            }
+            if let value = settings["defaultStyle"] as? String {
+                defaults.set(value, forKey: "defaultStyle")
+            }
+            if let value = settings["defaultUseStreaming"] as? Bool {
+                defaults.set(value, forKey: "defaultUseStreaming")
+            }
+            if let value = settings["autoSaveHistory"] as? Bool {
+                defaults.set(value, forKey: "autoSaveHistory")
+            }
+            if let value = settings["showMainWindowOnLaunch"] as? Bool {
+                defaults.set(value, forKey: "showMainWindowOnLaunch")
+            }
+            if let value = settings["appTheme"] as? String {
+                defaults.set(value, forKey: "appTheme")
+            }
+
+            // 剪贴板设置
+            if let value = settings["clipboardMonitorEnabled"] as? Bool {
+                defaults.set(value, forKey: "clipboardMonitorEnabled")
+            }
+            if let value = settings["clipboardMinimumLength"] as? Int {
+                defaults.set(value, forKey: "clipboardMinimumLength")
+            }
+            if let value = settings["clipboardPollingInterval"] as? Double {
+                defaults.set(value, forKey: "clipboardPollingInterval")
+            }
+            if let value = settings["clipboardExcludeURLs"] as? Bool {
+                defaults.set(value, forKey: "clipboardExcludeURLs")
+            }
+            if let value = settings["clipboardExcludeNumbers"] as? Bool {
+                defaults.set(value, forKey: "clipboardExcludeNumbers")
+            }
+            if let value = settings["clipboardExcludeCode"] as? Bool {
+                defaults.set(value, forKey: "clipboardExcludeCode")
+            }
+            if let value = settings["clipboardMaxLength"] as? Int {
+                defaults.set(value, forKey: "clipboardMaxLength")
+            }
+            if let value = settings["clipboardAutoCopyResult"] as? Bool {
+                defaults.set(value, forKey: "clipboardAutoCopyResult")
+            }
+            if let value = settings["clipboardShowNotification"] as? Bool {
+                defaults.set(value, forKey: "clipboardShowNotification")
+            }
+
+            // 快捷键设置
+            if let value = settings["globalHotKeyEnabled"] as? Bool {
+                defaults.set(value, forKey: "globalHotKeyEnabled")
+            }
+            if let value = settings["floatingPanelModifiers"] as? [String] {
+                defaults.set(value, forKey: "floatingPanelModifiers")
+            }
+            if let value = settings["floatingPanelKey"] as? String {
+                defaults.set(value, forKey: "floatingPanelKey")
+            }
+
+            // 高级设置
+            if let value = settings["backendURL"] as? String {
+                defaults.set(value, forKey: "backendURL")
+            }
+            if let value = settings["backendTimeout"] as? Int {
+                defaults.set(value, forKey: "backendTimeout")
+            }
+            if let value = settings["cacheSize"] as? Int {
+                defaults.set(value, forKey: "cacheSize")
+            }
+            if let value = settings["cacheTTL"] as? Int {
+                defaults.set(value, forKey: "cacheTTL")
+            }
+            if let value = settings["enableDebugLogging"] as? Bool {
+                defaults.set(value, forKey: "enableDebugLogging")
+            }
+            if let value = settings["showAPIResponseTime"] as? Bool {
+                defaults.set(value, forKey: "showAPIResponseTime")
+            }
+
+            // 同步到磁盘
+            defaults.synchronize()
+
+            print("[Settings] ✅ 设置导入成功，需要重启应用以生效")
+
+            // 显示成功通知（需要重启）
+            showImportSuccessAlert()
+        } catch {
+            print("[Settings] ❌ 设置导入失败: \(error)")
+            showImportErrorAlert(error: error)
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    private func showExportSuccessNotification() {
+        // 简单的成功通知（控制台）
+        // 完整的通知功能将在 NotificationManager 中实现
+        print("[Settings] ✅ 设置导出成功")
+    }
+
+    private func showExportErrorAlert(error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "导出失败"
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
+    }
+
+    private func showImportSuccessAlert() {
+        let alert = NSAlert()
+        alert.messageText = "导入成功"
+        alert.informativeText = "设置已导入，请重启应用以使所有设置生效。"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "稍后重启")
+        alert.addButton(withTitle: "立即退出")
+
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn {
+            // 立即退出应用
+            NSApplication.shared.terminate(nil)
+        }
+    }
+
+    private func showImportErrorAlert(error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "导入失败"
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
+    }
+}
+
+/// 设置错误
+enum SettingsError: LocalizedError {
+    case invalidFormat
+    case unsupportedVersion
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidFormat:
+            return "设置文件格式无效"
+        case .unsupportedVersion:
+            return "不支持的设置文件版本"
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidFormat:
+            return "请确认文件是由 MacCortex 导出的 JSON 格式"
+        case .unsupportedVersion:
+            return "请使用最新版本的 MacCortex 导出设置"
+        }
     }
 }
 
