@@ -101,6 +101,15 @@ struct TranslationView: View {
 
             Spacer()
 
+            // Phase 3 Week 3 Day 2: 流式模式开关
+            Toggle("流式", isOn: $viewModel.useStreamingMode)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .help("启用逐字显示效果")
+
+            Divider()
+                .frame(height: 20)
+
             // 历史记录按钮
             Button(action: {
                 withAnimation {
@@ -171,9 +180,14 @@ struct TranslationView: View {
 
             // 操作按钮
             HStack(spacing: 12) {
+                // Phase 3 Week 3 Day 2: 根据模式选择翻译方法
                 Button(action: {
                     Task {
-                        await viewModel.translate()
+                        if viewModel.useStreamingMode {
+                            await viewModel.translateStream()
+                        } else {
+                            await viewModel.translate()
+                        }
                     }
                 }) {
                     HStack {
@@ -182,15 +196,25 @@ struct TranslationView: View {
                                 .scaleEffect(0.7)
                                 .frame(width: 12, height: 12)
                         } else {
-                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Image(systemName: viewModel.useStreamingMode ? "play.circle.fill" : "arrow.triangle.2.circlepath")
                         }
-                        Text("翻译")
+                        Text(viewModel.useStreamingMode ? "流式翻译" : "翻译")
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.inputText.isEmpty || viewModel.isTranslating)
                 .keyboardShortcut(.return, modifiers: .command)
-                .help("翻译文本 (Cmd+Enter)")
+                .help(viewModel.useStreamingMode ? "流式翻译（逐字显示） (Cmd+Enter)" : "翻译文本 (Cmd+Enter)")
+
+                // Phase 3 Week 3 Day 2: 流式模式下显示停止按钮
+                if viewModel.isStreaming {
+                    Button(action: {
+                        viewModel.stopStreaming()
+                    }) {
+                        Label("停止", systemImage: "stop.circle.fill")
+                    }
+                    .buttonStyle(.bordered)
+                }
 
                 Button(action: {
                     viewModel.clear()
@@ -244,6 +268,15 @@ struct TranslationView: View {
                     Text("翻译结果")
                         .font(.caption)
                         .foregroundColor(.secondary)
+
+                    // Phase 3 Week 3 Day 2: 流式进度显示
+                    if viewModel.isStreaming {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                        Text(viewModel.streamProgress)
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
 
                     if viewModel.isCached {
                         HStack(spacing: 4) {
