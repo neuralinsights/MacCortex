@@ -15,7 +15,7 @@ from .planner import PlannerNode
 from .coder import CoderNode
 from .reviewer import ReviewerNode
 from .researcher import ResearcherNode
+from .tool_runner import ToolRunnerNode
 # from .reflector import ReflectorNode
-# from .tool_runner import ToolRunnerNode
 
-__all__ = ["PlannerNode", "CoderNode", "ReviewerNode", "ResearcherNode"]
+__all__ = ["PlannerNode", "CoderNode", "ReviewerNode", "ResearcherNode", "ToolRunnerNode"]
