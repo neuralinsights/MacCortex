@@ -36,6 +36,7 @@ struct ContentView: View {
 struct MainView: View {
     @Environment(AppState.self) private var appState
     @State private var showSettings = false
+    @State private var showUndoHistory = false  // Phase 2 Week 2 Day 10: 撤销历史
 
     var body: some View {
         NavigationView {
@@ -310,11 +311,23 @@ struct MainView: View {
                         Image(systemName: "gear")
                     }
                 }
+
+                ToolbarItem(placement: .automatic) {
+                    Button(action: {
+                        showUndoHistory = true
+                    }) {
+                        Label("撤销历史", systemImage: "arrow.uturn.backward.circle")
+                    }
+                }
             }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
                 .environment(appState)
+        }
+        .sheet(isPresented: $showUndoHistory) {
+            // Phase 2 Week 2 Day 10: 撤销历史视图
+            UndoHistoryView()
         }
         .sheet(isPresented: Binding(
             get: { appState.showRiskConfirmation },

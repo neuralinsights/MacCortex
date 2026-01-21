@@ -1,0 +1,7 @@
+{"timestamp": "2026-01-21T00:59:31.803956+00:00", "event_type": "request_start", "request_id": "7c273036-8726-415b-9467-ff7cd46b8d56", "client_ip_hash": "12ca17b49af22894", "method": "GET", "path": "/health"}
+{"timestamp": "2026-01-21T00:59:31.805376+00:00", "event_type": "request_end", "request_id": "7c273036-8726-415b-9467-ff7cd46b8d56", "client_ip_hash": "12ca17b49af22894", "status_code": 200, "duration_ms": 1.48, "success": true}
+{"timestamp": "2026-01-21T00:59:42.427073+00:00", "event_type": "request_start", "request_id": "4ec8b07b-f60d-4dca-b71c-4fc07fd07e95", "client_ip_hash": "12ca17b49af22894", "method": "POST", "path": "/execute"}
+{"timestamp": "2026-01-21T00:59:44.631660+00:00", "event_type": "pattern_execute", "request_id": "unknown", "pattern_id": "summarize", "input_length": 88, "output_length": 514, "duration_ms": 2203.7, "success": true, "security_flags": []}
+{"timestamp": "2026-01-21T00:59:44.631946+00:00", "event_type": "request_end", "request_id": "4ec8b07b-f60d-4dca-b71c-4fc07fd07e95", "client_ip_hash": "12ca17b49af22894", "status_code": 200, "duration_ms": 2204.88, "success": true}
+{"timestamp": "2026-01-21T01:07:27.781268+00:00", "event_type": "request_start", "request_id": "c3643828-c962-4eb9-a891-9f25214ecf06", "client_ip_hash": "12ca17b49af22894", "method": "GET", "path": "/health"}
+{"timestamp": "2026-01-21T01:07:27.781642+00:00", "event_type": "request_end", "request_id": "c3643828-c962-4eb9-a891-9f25214ecf06", "client_ip_hash": "12ca17b49af22894", "status_code": 200, "duration_ms": 0.38, "success": true}
