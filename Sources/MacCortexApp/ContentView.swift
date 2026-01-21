@@ -56,9 +56,8 @@ struct MainView: View {
                 }
                 .tag(1)
 
-            // Phase 3 Week 2 Day 5: 缓存统计（开发中）
-            Text("缓存统计（开发中）")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Phase 3 Week 2 Day 5: 缓存统计界面
+            CacheStatsView()
                 .tabItem {
                     Label("统计", systemImage: "chart.bar")
                 }
