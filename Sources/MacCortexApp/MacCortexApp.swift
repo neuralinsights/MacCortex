@@ -54,6 +54,7 @@ class AppState {
     var isProcessingPattern: Bool = false
     var currentPatternId: String? = nil
     var lastPatternResult: PatternResult? = nil
+    var lastError: String? = nil  // Phase 2 Week 2: API 错误信息
 
     // MARK: - Phase 2: 场景检测
     var detectedScene: DetectedScene? = nil
@@ -118,28 +119,63 @@ class AppState {
 
     // MARK: - Phase 2: Pattern 执行
 
-    /// 执行 Pattern
+    /// 执行 Pattern（调用 Backend API）
+    /// - Parameters:
+    ///   - patternId: Pattern ID
+    ///   - text: 输入文本
+    ///   - parameters: 参数字典
+    /// - Returns: Pattern 执行结果
     @MainActor
-    func executePattern(_ patternId: String, text: String, parameters: [String: Any] = [:]) async -> PatternResult {
+    func executePattern(_ patternId: String, text: String, parameters: [String: String] = [:]) async -> PatternResult {
         isProcessingPattern = true
         currentPatternId = patternId
+        lastError = nil
 
-        // TODO: Phase 2 Week 2 - 调用 Python Backend API
-        // 临时模拟结果
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 秒
+        let startTime = Date()
 
-        let result = PatternResult(
-            patternId: patternId,
-            output: "模拟输出（Phase 2 Week 2 将集成真实 Backend）",
-            success: true,
-            duration: 1.0
-        )
+        do {
+            // 调用 Backend API（Phase 2 Week 2 集成）
+            let apiClient = APIClient.shared
+            let response = try await apiClient.executePattern(
+                patternId: patternId,
+                text: text,
+                parameters: parameters
+            )
 
-        lastPatternResult = result
-        isProcessingPattern = false
-        currentPatternId = nil
+            let duration = Date().timeIntervalSince(startTime)
 
-        return result
+            // 构建结果
+            let result = PatternResult(
+                patternId: patternId,
+                output: response.output,
+                success: response.success,
+                duration: duration
+            )
+
+            lastPatternResult = result
+            isProcessingPattern = false
+            currentPatternId = nil
+
+            return result
+
+        } catch {
+            // 错误处理
+            let duration = Date().timeIntervalSince(startTime)
+            lastError = error.localizedDescription
+
+            let result = PatternResult(
+                patternId: patternId,
+                output: "执行失败: \(error.localizedDescription)",
+                success: false,
+                duration: duration
+            )
+
+            lastPatternResult = result
+            isProcessingPattern = false
+            currentPatternId = nil
+
+            return result
+        }
     }
 
     // MARK: - Phase 2: 场景检测
