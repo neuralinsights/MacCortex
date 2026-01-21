@@ -278,6 +278,11 @@ struct MainView: View {
                             }
                         }
                     }
+
+                    Divider()
+
+                    // Backend API 测试（Phase 2 Week 2 Day 6-7）
+                    BackendAPITestPanel()
                 }
                 .padding()
                 .background(Color.blue.opacity(0.05))
@@ -378,6 +383,177 @@ struct StatusRow: View {
                 .foregroundColor(status.color)
             Text(text)
             Spacer()
+        }
+    }
+}
+
+// MARK: - Backend API 测试面板（Phase 2 Week 2 Day 6-7）
+
+struct BackendAPITestPanel: View {
+    @Environment(AppState.self) private var appState
+    @State private var backendStatus: String = "检查中..."
+    @State private var statusColor: Color = .gray
+    @State private var isTestingAPI: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Backend API 连接")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Spacer()
+
+                // 连接状态指示器
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 8, height: 8)
+                    Text(backendStatus)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // API 测试按钮
+            HStack(spacing: 8) {
+                Button(action: {
+                    Task {
+                        await checkBackendStatus()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 10))
+                        Text("检查连接")
+                            .font(.system(size: 10))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: {
+                    Task {
+                        await testPatternExecution()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        if isTestingAPI {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                        } else {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 10))
+                        }
+                        Text("测试 Pattern")
+                            .font(.system(size: 10))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.green.opacity(0.1))
+                    .foregroundColor(.green)
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .disabled(isTestingAPI || appState.isProcessingPattern)
+            }
+
+            // 显示最后的执行结果
+            if let result = appState.lastPatternResult {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("最后执行:")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Text(result.patternId)
+                            .font(.system(size: 10, weight: .medium))
+                        Spacer()
+                        Text(result.success ? "✅" : "❌")
+                            .font(.system(size: 10))
+                    }
+
+                    Text(result.output)
+                        .font(.system(size: 9))
+                        .lineLimit(3)
+                        .foregroundStyle(.primary)
+
+                    HStack {
+                        Text("耗时: \(String(format: "%.2f", result.duration))s")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(result.timestamp, style: .time)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .background(result.success ? Color.green.opacity(0.05) : Color.red.opacity(0.05))
+                .cornerRadius(6)
+            }
+
+            // 显示错误信息
+            if let error = appState.lastError {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.red)
+                    Text(error)
+                        .font(.system(size: 9))
+                        .foregroundColor(.red)
+                        .lineLimit(2)
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(Color.red.opacity(0.05))
+                .cornerRadius(6)
+            }
+        }
+        .onAppear {
+            Task {
+                await checkBackendStatus()
+            }
+        }
+    }
+
+    // MARK: - 私有方法
+
+    /// 检查 Backend 连接状态
+    private func checkBackendStatus() async {
+        let apiClient = APIClient.shared
+
+        let isAvailable = await apiClient.isBackendAvailable()
+
+        await MainActor.run {
+            if isAvailable {
+                backendStatus = "已连接"
+                statusColor = .green
+            } else {
+                backendStatus = "未连接"
+                statusColor = .red
+            }
+        }
+    }
+
+    /// 测试 Pattern 执行
+    private func testPatternExecution() async {
+        await MainActor.run {
+            isTestingAPI = true
+        }
+
+        let _ = await appState.executePattern(
+            "summarize",
+            text: "Phase 2 Week 2 Backend API 集成测试。测试从 SwiftUI Frontend 调用 Python Backend 的 Pattern 执行功能。",
+            parameters: ["length": "short", "language": "zh-CN"]
+        )
+
+        await MainActor.run {
+            isTestingAPI = false
         }
     }
 }
