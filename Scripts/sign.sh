@@ -5,10 +5,34 @@
 
 set -euo pipefail
 
-# 配置变量（用户需要修改 DEVELOPER_ID）
+# 配置变量
 APP_PATH="${1:-build/MacCortex.app}"
 DEVELOPER_ID="${DEVELOPER_ID:-Developer ID Application: Your Name (TEAM_ID)}"
 ENTITLEMENTS="Resources/Entitlements/MacCortex.entitlements"
+
+# 检查 Developer ID 配置
+if [[ "$DEVELOPER_ID" == *"Your Name"* ]] || [[ "$DEVELOPER_ID" == *"TEAM_ID"* ]]; then
+    echo "❌ 错误: Developer ID 未配置"
+    echo ""
+    echo "请按以下步骤配置："
+    echo ""
+    echo "1. 申请 Apple Developer Program ($99/年)"
+    echo "   https://developer.apple.com/account"
+    echo ""
+    echo "2. 下载 Developer ID Application 证书"
+    echo "   Xcode → Settings → Accounts → Manage Certificates"
+    echo ""
+    echo "3. 查找您的 Team ID:"
+    echo "   https://developer.apple.com/account → Membership Details"
+    echo ""
+    echo "4. 设置环境变量（添加到 ~/.zshrc 或 ~/.bashrc）:"
+    echo "   export DEVELOPER_ID=\"Developer ID Application: Your Name (YOUR_TEAM_ID)\""
+    echo ""
+    echo "5. 验证证书可用:"
+    echo "   security find-identity -v -p codesigning | grep 'Developer ID Application'"
+    echo ""
+    exit 1
+fi
 
 echo "================================================"
 echo "MacCortex 代码签名流程"
