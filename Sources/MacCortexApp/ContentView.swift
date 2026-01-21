@@ -152,6 +152,83 @@ struct MainView: View {
                     ))
                     .toggleStyle(.switch)
 
+                    Divider()
+
+                    // 场景检测控制
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("智能场景检测")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+
+                            Spacer()
+
+                            Button(action: {
+                                if SceneDetector.shared.isDetecting {
+                                    appState.stopSceneDetection()
+                                } else {
+                                    appState.startSceneDetection()
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: SceneDetector.shared.isDetecting ? "stop.circle.fill" : "play.circle.fill")
+                                    Text(SceneDetector.shared.isDetecting ? "停止" : "启动")
+                                }
+                                .font(.system(size: 11))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(SceneDetector.shared.isDetecting ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                                .foregroundColor(SceneDetector.shared.isDetecting ? .red : .green)
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        // 实时检测信息
+                        if SceneDetector.shared.isDetecting {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("活动应用:")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                    Text(SceneDetector.shared.activeApplicationName.isEmpty ? "未检测" : SceneDetector.shared.activeApplicationName)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.primary)
+                                }
+
+                                HStack {
+                                    Text("窗口标题:")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                    Text(SceneDetector.shared.activeWindowTitle.isEmpty ? "未授权" : SceneDetector.shared.activeWindowTitle)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+                                }
+
+                                HStack {
+                                    Text("检测场景:")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                    HStack(spacing: 4) {
+                                        Image(systemName: SceneDetector.shared.currentScene.icon)
+                                            .font(.system(size: 10))
+                                        Text(SceneDetector.shared.currentScene.rawValue)
+                                            .font(.system(size: 10, weight: .medium))
+                                        Text("(\(Int(SceneDetector.shared.sceneConfidence * 100))%)")
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .foregroundStyle(.primary)
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 8)
+                            .background(Color.secondary.opacity(0.05))
+                            .cornerRadius(6)
+                        }
+                    }
+
                     // 场景检测测试
                     VStack(alignment: .leading, spacing: 8) {
                         Text("场景检测测试")
