@@ -107,6 +107,12 @@ struct TranslationView: View {
                 .controlSize(.small)
                 .help("启用逐字显示效果")
 
+            // Phase 3 Week 3 Day 3: 剪贴板监听开关
+            Toggle("剪贴板", isOn: $viewModel.clipboardMonitorEnabled)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .help("自动翻译复制的文本")
+
             Divider()
                 .frame(height: 20)
 

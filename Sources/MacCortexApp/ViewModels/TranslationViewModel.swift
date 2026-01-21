@@ -32,6 +32,9 @@ class TranslationViewModel: ObservableObject {
     @Published var streamProgress: String = ""
     @Published var useStreamingMode: Bool = false  // 流式模式开关
 
+    // Phase 3 Week 3 Day 3: 剪贴板监听支持
+    @Published var clipboardMonitorEnabled: Bool = false
+
     // MARK: - Private Properties
 
     private let client = BackendClient.shared
@@ -40,6 +43,9 @@ class TranslationViewModel: ObservableObject {
 
     // Phase 3 Week 3 Day 2: SSE 客户端
     private var sseClient: SSEClient?
+
+    // Phase 3 Week 3 Day 3: 剪贴板监听器
+    private var clipboardMonitor: ClipboardMonitor?
 
     // MARK: - Initialization
 
@@ -62,6 +68,9 @@ class TranslationViewModel: ObservableObject {
         Task {
             await checkBackendConnection()
         }
+
+        // Phase 3 Week 3 Day 3: 初始化剪贴板监听器
+        setupClipboardMonitor()
     }
 
     // MARK: - Public Methods
@@ -404,6 +413,48 @@ class TranslationViewModel: ObservableObject {
         default:
             break
         }
+    }
+
+    // MARK: - Clipboard Monitoring (Phase 3 Week 3 Day 3)
+
+    /// 设置剪贴板监听器
+    private func setupClipboardMonitor() {
+        clipboardMonitor = ClipboardMonitor()
+
+        // 监听启用状态变化
+        $clipboardMonitorEnabled
+            .sink { [weak self] isEnabled in
+                guard let self = self else { return }
+                self.clipboardMonitor?.isEnabled = isEnabled
+            }
+            .store(in: &cancellables)
+
+        // 设置剪贴板变化回调
+        clipboardMonitor?.onClipboardChange = { [weak self] text in
+            Task { @MainActor in
+                self?.handleClipboardText(text)
+            }
+        }
+    }
+
+    /// 处理剪贴板文本
+    private func handleClipboardText(_ text: String) {
+        // 1. 自动填充输入框
+        inputText = text
+
+        // 2. 自动触发翻译（根据流式模式选择）
+        Task {
+            if useStreamingMode {
+                await translateStream()
+            } else {
+                await translate()
+            }
+        }
+    }
+
+    /// 切换剪贴板监听状态
+    func toggleClipboardMonitor() {
+        clipboardMonitorEnabled.toggle()
     }
 }
 
