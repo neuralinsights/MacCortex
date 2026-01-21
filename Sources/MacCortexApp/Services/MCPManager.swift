@@ -42,10 +42,8 @@ actor MCPManager {
             self.whitelistURL = URL(fileURLWithPath: "Resources/Config/mcp_whitelist.json")
         }
 
-        // 同步加载白名单（阻塞初始化，确保白名单可用）
-        Task {
-            await loadWhitelist()
-        }
+        // 延迟加载白名单（Phase 2 Week 3 Day 15: 内存优化）
+        // 不在 init 时加载，等到首次使用时再加载
     }
 
     /// 确保白名单已加载
@@ -67,6 +65,7 @@ actor MCPManager {
         await ensureWhitelistLoaded()
 
         // 1. 白名单检查
+        #if DEBUG
         logger.info("🔍 [DEBUG] 检查白名单：")
         logger.info("   URL: \(url.absoluteString)")
         logger.info("   白名单已加载: \(self.whitelist != nil)")
@@ -76,6 +75,7 @@ actor MCPManager {
             logger.info("   白名单内容: \(whitelist.allowedServers)")
             logger.info("   包含此服务器: \(whitelist.contains(url))")
         }
+        #endif
 
         guard let whitelist = self.whitelist,
               whitelist.contains(url) else {
@@ -83,7 +83,9 @@ actor MCPManager {
             throw MCPError.notWhitelisted
         }
 
+        #if DEBUG
         logger.info("✅ 白名单检查通过")
+        #endif
 
         // 2. 检查是否已加载
         if let existing = loadedServers.first(where: { $0.url == url }) {

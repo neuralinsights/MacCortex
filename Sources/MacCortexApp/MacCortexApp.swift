@@ -25,9 +25,14 @@ struct MacCortexApp: App {
     @State private var appState = AppState()
 
     init() {
-        // Phase 2 Week 3 Day 13-14: 注册 App Intents（macOS Shortcuts 支持）
+        // Phase 2 Week 3 Day 15: 延迟 App Intents 注册（启动优化）
+        // 不阻塞主启动流程，首次显示后再注册
         if #available(macOS 13.0, *) {
-            MacCortexAppShortcuts.updateAppShortcutParameters()
+            Task.detached(priority: .background) {
+                // 延迟 0.5 秒，等待主窗口显示后再注册
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                MacCortexAppShortcuts.updateAppShortcutParameters()
+            }
         }
     }
 
@@ -87,22 +92,32 @@ class AppState {
     var isLoadingMCPServers: Bool = false
 
     init() {
-        checkPermissions()
-    }
-
-    func checkPermissions() {
-        // Phase 0.5 Day 6-7: 集成 FullDiskAccessManager
-        hasFullDiskAccess = FullDiskAccessManager.shared.hasFullDiskAccess
-
-        // Phase 1 Week 1 Day 1-2: 集成 AccessibilityManager
-        hasAccessibilityPermission = AccessibilityManager.shared.hasAccessibilityPermission
-
-        // 检查是否首次运行
+        // Phase 2 Week 3 Day 15: 异步权限检查（启动优化）
+        // 快速检查首次运行状态，权限检查异步执行
         let defaults = UserDefaults.standard
         isFirstRun = !defaults.bool(forKey: "HasLaunchedBefore")
 
         if isFirstRun {
             defaults.set(true, forKey: "HasLaunchedBefore")
+        }
+
+        // 异步执行权限检查，不阻塞主线程
+        Task.detached(priority: .userInitiated) {
+            await self.checkPermissions()
+        }
+    }
+
+    func checkPermissions() async {
+        // Phase 0.5 Day 6-7: 集成 FullDiskAccessManager
+        let fda = FullDiskAccessManager.shared.hasFullDiskAccess
+
+        // Phase 1 Week 1 Day 1-2: 集成 AccessibilityManager
+        let accessibility = AccessibilityManager.shared.hasAccessibilityPermission
+
+        // 更新主线程状态
+        await MainActor.run {
+            self.hasFullDiskAccess = fda
+            self.hasAccessibilityPermission = accessibility
         }
     }
 
@@ -292,10 +307,18 @@ class AppState {
         currentTrustLevel = level
     }
 
-    /// 添加待审批操作
+    /// 添加待审批操作（Phase 2 Week 3 Day 15: 限制队列大小）
     @MainActor
     func addPendingOperation(_ operation: PendingOperation) {
         pendingOperations.append(operation)
+
+        // 限制队列大小为 100，避免内存无限增长
+        if pendingOperations.count > 100 {
+            // 移除最旧的已完成/已拒绝操作
+            pendingOperations.removeAll { op in
+                op.status != .pending && op.timestamp.timeIntervalSinceNow < -3600  // 1 小时前
+            }
+        }
     }
 
     /// 批准操作
