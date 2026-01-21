@@ -276,45 +276,98 @@ class TranslatePattern(BasePattern):
         preserve_format: bool,
         glossary: Dict[str, str],
     ) -> str:
-        """构建翻译提示词"""
-        # 语言代码映射
+        """
+        构建翻译提示词（Phase 2 Week 4 Day 16 优化）
+
+        优化要点：
+        1. 简化系统提示，明确任务目标
+        2. 强调"只输出翻译"，避免重复原文
+        3. 使用 IMPORTANT 标记关键规则
+        """
+        # 语言代码映射（Phase 2 Week 4 Day 16：同时支持简短和完整格式）
         lang_names = {
             "auto": "自动检测",
+            # 中文
+            "zh": "简体中文",
             "zh-CN": "简体中文",
             "zh-TW": "繁体中文",
+            # 英文
             "en": "English",
+            "en-US": "English",
+            # 日文
             "ja": "日本語",
+            "ja-JP": "日本語",
+            # 韩文
             "ko": "한국어",
+            "ko-KR": "한국어",
+            # 法文
             "fr": "Français",
+            "fr-FR": "Français",
+            # 德文
             "de": "Deutsch",
+            "de-DE": "Deutsch",
+            # 西班牙文
             "es": "Español",
+            "es-ES": "Español",
+            # 俄文
             "ru": "Русский",
+            "ru-RU": "Русский",
+            # 阿拉伯文
             "ar": "العربية",
+            "ar-AR": "العربية",
         }
 
-        source_name = lang_names.get(source_language, source_language)
         target_name = lang_names.get(target_language, target_language)
 
-        # 风格描述
-        style_desc = {"formal": "正式、专业", "casual": "随意、口语化", "technical": "技术、精确"}.get(style, "正式")
+        # 风格描述映射（更简洁）
+        style_map = {
+            "formal": "formal and professional",
+            "casual": "casual and conversational",
+            "technical": "technical and precise"
+        }
+        style_desc = style_map.get(style, "natural")
 
-        prompt = f"""你是一个专业的翻译助手。请将以下文本翻译为 {target_name}。
+        # 根据目标语言选择系统提示语言（Phase 2 Week 4 Day 16 优化 v2）
+        # 为中文、日文、韩文等目标语言使用中文系统提示，增强模型理解
+        use_chinese_prompt = target_language in ["zh", "zh-CN", "zh-TW", "ja", "ja-JP", "ko", "ko-KR"]
 
-原文（{source_name}）：
-{text}
+        if use_chinese_prompt:
+            # 中文系统提示（针对亚洲语言翻译优化）
+            prompt = f"""你是专业翻译助手。请将以下文本翻译为{target_name}（{style_desc} 风格）。
 
-翻译要求：
-- 目标语言：{target_name}
-- 翻译风格：{style_desc}
-"""
+重要规则：
+- 只输出翻译结果，不要解释
+- 不要重复原文
+- 保留原文的语气和意思"""
 
-        if preserve_format:
-            prompt += "- 保留原文格式（换行、段落、标点等）\n"
+            if preserve_format:
+                prompt += "\n- 保留原文格式（换行、段落、标点）"
 
-        if glossary:
-            prompt += f"- 术语词典：{glossary}\n"
+            if glossary:
+                glossary_str = ", ".join([f"{k}→{v}" for k, v in glossary.items()])
+                prompt += f"\n- 使用这些术语：{glossary_str}"
 
-        prompt += "\n请直接输出翻译结果，不要添加任何解释或说明。"
+            # 用户内容（明确分隔）
+            prompt += f"\n\n原文：\n{text}\n\n翻译结果："
+        else:
+            # 英文系统提示（针对西方语言翻译）
+            prompt = f"""You are a professional translator.
+Translate the following text to {target_name} ({style_desc} style).
+
+IMPORTANT:
+- Only output the translation, NO explanations
+- Do NOT repeat the original text
+- Preserve the meaning and tone"""
+
+            if preserve_format:
+                prompt += "\n- Keep the formatting (line breaks, paragraphs, punctuation)"
+
+            if glossary:
+                glossary_str = ", ".join([f"{k}→{v}" for k, v in glossary.items()])
+                prompt += f"\n- Use these terms: {glossary_str}"
+
+            # 用户内容（明确分隔）
+            prompt += f"\n\nText to translate:\n{text}\n\nTranslation:"
 
         return prompt
 

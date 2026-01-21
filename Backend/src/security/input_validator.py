@@ -36,8 +36,19 @@ class InputValidator:
             "language": ["zh-CN", "en-US", "ja-JP", "ko-KR", "auto"],
         },
         "translate": {
-            "target_language": ["zh-CN", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE"],
-            "source_language": ["auto", "zh-CN", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE"],
+            "target_language": [
+                # 完整格式（ISO 639-1 + ISO 3166-1）
+                "zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE", "ru-RU", "ar-AR",
+                # 简短格式（ISO 639-1，用户体验优化 - Phase 2 Week 4 Day 16）
+                "zh", "en", "ja", "ko", "es", "fr", "de", "ru", "ar"
+            ],
+            "source_language": [
+                "auto",
+                # 完整格式
+                "zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE", "ru-RU", "ar-AR",
+                # 简短格式
+                "zh", "en", "ja", "ko", "es", "fr", "de", "ru", "ar"
+            ],
             "style": ["formal", "casual", "technical"],
         },
         "format": {
