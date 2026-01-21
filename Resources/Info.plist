@@ -50,5 +50,9 @@
     <key>NSSystemAdministrationUsageDescription</key>
     <string>MacCortex needs Full Disk Access to read and organize your files, notes, and documents.</string>
 
+    <!-- App Intents 支持（Phase 2 Week 3 Day 13-14） -->
+    <key>NSSupportsAppIntents</key>
+    <true/>
+
 </dict>
 </plist>

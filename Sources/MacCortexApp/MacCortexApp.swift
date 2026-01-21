@@ -18,10 +18,18 @@
 import SwiftUI
 import Observation
 import PermissionsKit
+import AppIntents
 
 @main
 struct MacCortexApp: App {
     @State private var appState = AppState()
+
+    init() {
+        // Phase 2 Week 3 Day 13-14: 注册 App Intents（macOS Shortcuts 支持）
+        if #available(macOS 13.0, *) {
+            MacCortexAppShortcuts.updateAppShortcutParameters()
+        }
+    }
 
     var body: some Scene {
         WindowGroup {

@@ -17,6 +17,7 @@ import SwiftUI
 
 /// MCP 服务器列表视图
 struct MCPServerListView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var servers: [MCPServer] = []
     @State private var isLoading = true
     @State private var showAddServer = false
@@ -50,6 +51,15 @@ struct MCPServerListView: View {
                     Label("添加服务器", systemImage: "plus.circle.fill")
                 }
                 .buttonStyle(.borderedProminent)
+
+                // 关闭按钮
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("关闭")
             }
             .padding()
 
@@ -113,6 +123,7 @@ struct MCPServerListView: View {
             }
         }
         .frame(width: 600, height: 500)
+        .background(Color(NSColor.windowBackgroundColor))
         .onAppear { loadServers() }
         .sheet(isPresented: $showAddServer) {
             AddMCPServerSheet(onAdd: { url in
@@ -251,8 +262,36 @@ struct AddMCPServerSheet: View {
                 Text("服务器路径")
                     .font(.headline)
 
-                TextField("例如: /usr/local/bin/mcp-server-filesystem", text: $serverPath)
-                    .textFieldStyle(.roundedBorder)
+                HStack(spacing: 8) {
+                    TextField("例如: /usr/local/bin/mcp-server-filesystem", text: $serverPath)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13, design: .monospaced))
+                        .padding(8)
+                        .background(Color(NSColor.textBackgroundColor))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+
+                    Button(action: {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = true
+                        panel.canChooseDirectories = false
+                        panel.allowsMultipleSelection = false
+                        panel.directoryURL = URL(fileURLWithPath: "/usr/local/bin")
+                        panel.prompt = "选择 MCP 服务器"
+
+                        if panel.runModal() == .OK, let url = panel.url {
+                            serverPath = url.path
+                        }
+                    }) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.bordered)
+                    .help("浏览文件")
+                }
 
                 // 白名单提示
                 HStack(spacing: 8) {
@@ -271,6 +310,13 @@ struct AddMCPServerSheet: View {
 
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                     QuickServerButton(
+                        name: "🧪 测试服务器",
+                        icon: "testtube.2",
+                        path: "/tmp/mcp-test-server",
+                        onSelect: { serverPath = $0 }
+                    )
+
+                    QuickServerButton(
                         name: "文件系统",
                         icon: "folder.fill",
                         path: "/usr/local/bin/mcp-server-filesystem",
@@ -288,13 +334,6 @@ struct AddMCPServerSheet: View {
                         name: "搜索",
                         icon: "magnifyingglass",
                         path: "/usr/local/bin/mcp-server-brave-search",
-                        onSelect: { serverPath = $0 }
-                    )
-
-                    QuickServerButton(
-                        name: "记忆",
-                        icon: "brain.head.profile",
-                        path: "/usr/local/bin/mcp-server-memory",
                         onSelect: { serverPath = $0 }
                     )
                 }
@@ -335,28 +374,34 @@ struct AddMCPServerSheet: View {
         }
         .padding(24)
         .frame(width: 500, height: 450)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
     // MARK: - 私有方法
 
     private func addServer() {
-        guard let url = URL(string: "file://\(serverPath)") else {
-            errorMessage = "无效的服务器路径"
-            return
-        }
+        // 使用 fileURLWithPath 确保正确的 file:/// URL 格式
+        let url = URL(fileURLWithPath: serverPath)
+
+        print("🔍 [DEBUG] 尝试添加服务器：")
+        print("   路径: \(serverPath)")
+        print("   URL: \(url.absoluteString)")
 
         // 检查文件是否存在
         guard FileManager.default.fileExists(atPath: serverPath) else {
             errorMessage = "服务器文件不存在"
+            print("   ❌ 文件不存在")
             return
         }
 
         // 检查文件是否可执行
         guard FileManager.default.isExecutableFile(atPath: serverPath) else {
             errorMessage = "服务器文件不可执行"
+            print("   ❌ 文件不可执行")
             return
         }
 
+        print("   ✅ 文件检查通过，调用 onAdd")
         onAdd(url)
     }
 }

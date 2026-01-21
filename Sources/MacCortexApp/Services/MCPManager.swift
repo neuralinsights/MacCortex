@@ -32,14 +32,26 @@ actor MCPManager {
 
     private init() {
         // 白名单配置文件路径
-        self.whitelistURL = Bundle.main.url(
-            forResource: "mcp_whitelist",
-            withExtension: "json",
-            subdirectory: "Config"
-        ) ?? URL(fileURLWithPath: "/tmp/mcp_whitelist.json")
+        // 尝试多个可能的位置
+        if let url = Bundle.main.url(forResource: "mcp_whitelist", withExtension: "json", subdirectory: "Config") {
+            self.whitelistURL = url
+        } else if let url = Bundle.main.url(forResource: "mcp_whitelist", withExtension: "json") {
+            self.whitelistURL = url
+        } else {
+            // 回退到项目根目录（开发时）
+            self.whitelistURL = URL(fileURLWithPath: "Resources/Config/mcp_whitelist.json")
+        }
 
-        // 加载白名单
+        // 同步加载白名单（阻塞初始化，确保白名单可用）
         Task {
+            await loadWhitelist()
+        }
+    }
+
+    /// 确保白名单已加载
+    private func ensureWhitelistLoaded() async {
+        // 如果白名单未加载，等待加载完成
+        if self.whitelist == nil {
             await loadWhitelist()
         }
     }
@@ -51,12 +63,27 @@ actor MCPManager {
     /// - Returns: 服务器 ID
     /// - Throws: MCPError
     func loadServer(url: URL) async throws -> UUID {
+        // 0. 确保白名单已加载
+        await ensureWhitelistLoaded()
+
         // 1. 白名单检查
-        guard let whitelist = whitelist,
+        logger.info("🔍 [DEBUG] 检查白名单：")
+        logger.info("   URL: \(url.absoluteString)")
+        logger.info("   白名单已加载: \(self.whitelist != nil)")
+
+        if let whitelist = self.whitelist {
+            logger.info("   白名单服务器数: \(whitelist.allowedServers.count)")
+            logger.info("   白名单内容: \(whitelist.allowedServers)")
+            logger.info("   包含此服务器: \(whitelist.contains(url))")
+        }
+
+        guard let whitelist = self.whitelist,
               whitelist.contains(url) else {
-            logger.error("MCP 服务器未在白名单中: \(url.path)")
+            logger.error("❌ MCP 服务器未在白名单中: \(url.absoluteString)")
             throw MCPError.notWhitelisted
         }
+
+        logger.info("✅ 白名单检查通过")
 
         // 2. 检查是否已加载
         if let existing = loadedServers.first(where: { $0.url == url }) {
