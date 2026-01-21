@@ -10,13 +10,15 @@
 //
 
 // MacCortex 主视图
-// Phase 0.5
+// Phase 0.5 - 基础设施
+// Phase 2 Day 1 - Observation Framework 升级
 // 创建时间：2026-01-20
+// 更新时间：2026-01-21
 
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         Group {
@@ -24,7 +26,7 @@ struct ContentView: View {
                 // Phase 0.5 Day 8: 首次启动引导
                 FirstRunView()
             } else {
-                // 主界面（Phase 1+ 开发）
+                // 主界面（Phase 2 开发）
                 MainView()
             }
         }
@@ -32,7 +34,7 @@ struct ContentView: View {
 }
 
 struct MainView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) private var appState
     @State private var showSettings = false
 
     var body: some View {
@@ -115,15 +117,19 @@ struct MainView: View {
                              status: .completed)
 
                     StatusRow(icon: "checkmark.circle.fill",
-                             text: "Phase 1 Day 1-3: 权限管理",
+                             text: "Phase 1: Python Backend",
+                             status: .completed)
+
+                    StatusRow(icon: "checkmark.circle.fill",
+                             text: "Phase 1.5: 安全强化",
                              status: .completed)
 
                     StatusRow(icon: "circle.fill",
-                             text: "Phase 1 Day 4-5: 集成测试",
+                             text: "Phase 2 Week 1: SwiftUI 架构",
                              status: .inProgress)
 
                     StatusRow(icon: "circle",
-                             text: "Phase 1 Week 2: Pattern CLI",
+                             text: "Phase 2 Week 2: 浮动工具栏",
                              status: .pending)
                 }
                 .padding()
@@ -146,7 +152,7 @@ struct MainView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
-                .environmentObject(appState)
+                .environment(appState)
         }
     }
 }
@@ -221,5 +227,5 @@ struct StatusRow: View {
 
 #Preview {
     ContentView()
-        .environmentObject(AppState())
+        .environment(AppState())
 }

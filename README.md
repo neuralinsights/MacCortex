@@ -34,6 +34,39 @@
 
 ---
 
+### 🚧 Phase 2: Desktop GUI + 智能场景识别 - 进行中（2026-01-21）
+
+**Week 1 进度**（Day 1/5 已完成）:
+- ✅ **Observation Framework 升级**: 使用 Swift 5.9+ @Observable 宏
+- ✅ **AppState 重构**: 现代化状态管理（替换 ObservableObject）
+- ✅ **核心数据模型定义**:
+  - `PatternResult` - Pattern 执行结果
+  - `DetectedScene` - 智能场景检测（6 种场景）
+  - `TrustLevel` - 渐进式信任等级（R0-R3）
+  - `PendingOperation` - 待审批操作管理
+- ✅ **编译验证**: Swift 编译成功（0.08s）
+- ⏳ **下一步**: Day 2 浮动工具栏 UI + 场景检测
+
+**核心功能设计**:
+- 🎨 SwiftUI + Observation Framework（现代化界面）
+- 🎯 智能场景识别（Accessibility API 自动检测用户意图）
+- ⚡ 浮动工具栏（Apple Intelligence 风格）
+- 🔄 渐进式信任机制（R0-R3 风险等级）
+- ↩️ 一键撤销（7 天文件版本管理）
+
+**技术栈**:
+- SwiftUI（macOS 14+）
+- Observation Framework（Swift 5.9+）
+- SwiftData（替代 Core Data）
+- Accessibility API（场景检测）
+- FileProvider（文件版本管理）
+
+**工期**: 3 周（15 天）
+
+详细计划：[Docs/PHASE_2_IMPLEMENTATION_PLAN.md](Docs/PHASE_2_IMPLEMENTATION_PLAN.md)
+
+---
+
 ### ✅ Phase 1: Python Backend - 已完成（2026-01-20）
 
 - ✅ **5 个核心 Pattern**: Summarize, Extract, Translate, Format, Search

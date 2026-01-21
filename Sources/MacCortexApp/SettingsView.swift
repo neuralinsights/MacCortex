@@ -11,13 +11,15 @@
 
 // MacCortex 设置界面
 // Phase 1 - Week 1 Day 4
+// Phase 2 Day 1 - Observation Framework 升级
 // 创建时间：2026-01-20
+// 更新时间：2026-01-21
 
 import SwiftUI
 import PermissionsKit
 
 struct SettingsView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) var dismiss
     @State private var isRequestingFDA = false
     @State private var isRequestingAccessibility = false
@@ -222,5 +224,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
-        .environmentObject(AppState())
+        .environment(AppState())
 }

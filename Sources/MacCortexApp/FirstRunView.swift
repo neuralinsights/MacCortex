@@ -11,14 +11,15 @@
 
 // MacCortex 首次启动引导界面
 // Phase 0.5 - Day 8
+// Phase 2 Day 1 - Observation Framework 升级
 // 创建时间：2026-01-20
-// 更新时间：2026-01-20 (Day 6-7: 集成 PermissionsKit)
+// 更新时间：2026-01-21
 
 import SwiftUI
 import PermissionsKit
 
 struct FirstRunView: View {
-    @EnvironmentObject var appState: AppState
+    @Environment(AppState.self) private var appState
     @State private var currentStep = 0
     @State private var isRequestingFDA = false
     @State private var isRequestingAccessibility = false
@@ -338,5 +339,5 @@ struct PermissionCard: View {
 
 #Preview {
     FirstRunView()
-        .environmentObject(AppState())
+        .environment(AppState())
 }
