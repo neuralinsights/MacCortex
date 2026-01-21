@@ -29,7 +29,7 @@ import sys
 import unicodedata
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, status
@@ -178,6 +178,89 @@ class PatternResponse(BaseModel):
     metadata: Dict[str, Any] | None = Field(None, description="元数据")
     error: str | None = Field(None, description="错误信息")
     duration: float = Field(..., description="执行时间（秒）")
+
+
+class BatchTranslationItem(BaseModel):
+    """批量翻译单个条目（Phase 3 Backend 优化 2）"""
+
+    text: str = Field(..., description="待翻译文本", max_length=50_000)
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="翻译参数")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "text": "Hello, world!",
+                    "parameters": {"target_language": "zh-CN", "style": "casual"},
+                }
+            ]
+        }
+    }
+
+
+class BatchPatternRequest(BaseModel):
+    """批量 Pattern 执行请求（Phase 3 Backend 优化 2）"""
+
+    pattern_id: str = Field(..., description="Pattern ID（仅支持 'translate'）", max_length=50)
+    items: List[BatchTranslationItem] = Field(..., description="批量翻译条目列表", max_length=100)
+    request_id: str = Field(default="", description="请求 ID（可选）")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "pattern_id": "translate",
+                    "items": [
+                        {"text": "Hello", "parameters": {"target_language": "zh-CN"}},
+                        {"text": "World", "parameters": {"target_language": "zh-CN"}},
+                    ],
+                    "request_id": "batch-req-12345",
+                }
+            ]
+        }
+    }
+
+    @field_validator("pattern_id")
+    @classmethod
+    def validate_pattern_id(cls, v: str) -> str:
+        """验证 Pattern ID（批量处理仅支持 translate）"""
+        if v != "translate":
+            raise ValueError("批量处理仅支持 'translate' pattern")
+        return v
+
+    @field_validator("items")
+    @classmethod
+    def validate_items(cls, v: List[BatchTranslationItem]) -> List[BatchTranslationItem]:
+        """验证批量条目"""
+        if len(v) == 0:
+            raise ValueError("批量条目列表不能为空")
+        if len(v) > 100:
+            raise ValueError("批量条目最多 100 个")
+        return v
+
+
+class BatchItemResponse(BaseModel):
+    """批量处理单个条目响应"""
+
+    index: int = Field(..., description="条目索引")
+    success: bool = Field(..., description="是否成功")
+    output: str | None = Field(None, description="输出结果")
+    metadata: Dict[str, Any] | None = Field(None, description="元数据")
+    error: str | None = Field(None, description="错误信息")
+    duration: float = Field(..., description="执行时间（秒）")
+
+
+class BatchPatternResponse(BaseModel):
+    """批量 Pattern 执行响应（Phase 3 Backend 优化 2）"""
+
+    request_id: str = Field(..., description="请求 ID")
+    success: bool = Field(..., description="整体是否成功")
+    total: int = Field(..., description="总条目数")
+    succeeded: int = Field(..., description="成功条目数")
+    failed: int = Field(..., description="失败条目数")
+    items: List[BatchItemResponse] = Field(..., description="各条目响应")
+    aggregate_stats: Dict[str, Any] = Field(..., description="聚合统计")
+    duration: float = Field(..., description="总执行时间（秒）")
 
 
 class HealthResponse(BaseModel):
@@ -413,6 +496,181 @@ async def execute_pattern(request: PatternRequest):
             metadata=None,
             error=str(e),
             duration=duration,
+        )
+
+
+@app.post("/execute/batch", response_model=BatchPatternResponse, summary="Execute batch translation")
+async def execute_pattern_batch(request: BatchPatternRequest):
+    """
+    批量执行翻译 Pattern（Phase 3 Backend 优化 2）
+
+    特性：
+    - 支持一次请求翻译多个文本（最多 100 个）
+    - 充分利用翻译缓存（重复文本直接命中）
+    - 返回聚合统计（总耗时、缓存命中率、加速倍数）
+    - 单个失败不影响其他条目
+
+    使用场景：
+    - 批量翻译剪贴板历史
+    - 文档段落批量翻译
+    - 会话记录批量翻译
+    """
+    start_time = datetime.now()
+
+    # Phase 1.5: 获取审计日志器
+    from security.audit_logger import get_audit_logger
+    audit_logger = get_audit_logger()
+
+    # Phase 1.5 Day 6-7: 获取输入验证器
+    from security.input_validator import get_input_validator
+    input_validator = get_input_validator()
+
+    try:
+        logger.info(
+            f"📥 收到批量请求: pattern={request.pattern_id}, "
+            f"items={len(request.items)}, request_id={request.request_id}"
+        )
+
+        registry: PatternRegistry = app.state.registry
+
+        # 批量执行
+        items_responses: List[BatchItemResponse] = []
+        succeeded = 0
+        failed = 0
+        total_cache_hits = 0
+        total_cache_misses = 0
+
+        for idx, item in enumerate(request.items):
+            item_start = datetime.now()
+
+            try:
+                # Phase 1.5 Day 6-7: 验证参数（白名单检查）
+                is_valid, error, validated_params = input_validator.validate_parameters(
+                    pattern_id=request.pattern_id,
+                    parameters=item.parameters,
+                )
+
+                if not is_valid:
+                    raise ValueError(error)
+
+                # 执行翻译
+                result = await registry.execute(
+                    pattern_id=request.pattern_id,
+                    text=item.text,
+                    parameters=validated_params,
+                )
+
+                item_duration = (datetime.now() - item_start).total_seconds()
+
+                # 统计缓存命中
+                metadata = result.get("metadata", {})
+                if isinstance(metadata, dict):
+                    if metadata.get("cached"):
+                        total_cache_hits += 1
+                    else:
+                        total_cache_misses += 1
+
+                items_responses.append(
+                    BatchItemResponse(
+                        index=idx,
+                        success=True,
+                        output=result["output"],
+                        metadata=metadata,
+                        error=None,
+                        duration=item_duration,
+                    )
+                )
+                succeeded += 1
+
+            except Exception as e:
+                # 单个条目失败不影响其他条目
+                logger.warning(f"⚠️ 批量请求第 {idx} 项失败: {e}")
+                item_duration = (datetime.now() - item_start).total_seconds()
+
+                items_responses.append(
+                    BatchItemResponse(
+                        index=idx,
+                        success=False,
+                        output=None,
+                        metadata=None,
+                        error=str(e),
+                        duration=item_duration,
+                    )
+                )
+                failed += 1
+
+        duration = (datetime.now() - start_time).total_seconds()
+
+        # 计算聚合统计
+        total_requests = total_cache_hits + total_cache_misses
+        cache_hit_rate = total_cache_hits / total_requests if total_requests > 0 else 0.0
+
+        # 估算加速倍数（假设未缓存翻译平均 2.5 秒，缓存翻译平均 0.01 秒）
+        estimated_no_cache_time = len(request.items) * 2.5  # 假设每个翻译 2.5 秒
+        actual_time = duration
+        speedup = estimated_no_cache_time / actual_time if actual_time > 0 else 1.0
+
+        aggregate_stats = {
+            "total_items": len(request.items),
+            "succeeded": succeeded,
+            "failed": failed,
+            "cache_hits": total_cache_hits,
+            "cache_misses": total_cache_misses,
+            "cache_hit_rate": cache_hit_rate,
+            "total_duration": duration,
+            "avg_item_duration": duration / len(request.items) if len(request.items) > 0 else 0.0,
+            "estimated_speedup": f"{speedup:.1f}x",
+        }
+
+        logger.info(
+            f"✅ 批量执行完成: total={len(request.items)}, succeeded={succeeded}, "
+            f"failed={failed}, cache_hit_rate={cache_hit_rate:.1%}, duration={duration:.2f}s"
+        )
+
+        # Phase 1.5: 记录批量执行
+        audit_logger.log_pattern_execution(
+            request_id=request.request_id,
+            pattern_id=f"{request.pattern_id}_batch",
+            input_length=sum(len(item.text) for item in request.items),
+            output_length=sum(
+                len(resp.output) if resp.output else 0 for resp in items_responses
+            ),
+            duration_ms=duration * 1000,
+            success=(failed == 0),
+            security_flags=[],
+        )
+
+        return BatchPatternResponse(
+            request_id=request.request_id,
+            success=(failed == 0),
+            total=len(request.items),
+            succeeded=succeeded,
+            failed=failed,
+            items=items_responses,
+            aggregate_stats=aggregate_stats,
+            duration=duration,
+        )
+
+    except Exception as e:
+        # 批量执行失败
+        logger.error(f"❌ 批量执行失败: {e}")
+        duration = (datetime.now() - start_time).total_seconds()
+
+        # Phase 1.5: 记录异常
+        audit_logger.log_security_event(
+            request_id=request.request_id,
+            event_subtype="batch_pattern_error",
+            severity="high",
+            details={
+                "pattern_id": request.pattern_id,
+                "items_count": len(request.items),
+                "error": str(e),
+            },
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"批量执行失败: {str(e)}",
         )
 
 

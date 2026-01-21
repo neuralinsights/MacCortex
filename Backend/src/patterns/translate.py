@@ -18,6 +18,7 @@ from loguru import logger
 
 from .base import BasePattern
 from utils.config import settings
+from utils.cache import TranslationCache  # Phase 3: 翻译缓存
 
 
 class TranslatePattern(BasePattern):
@@ -38,6 +39,9 @@ class TranslatePattern(BasePattern):
         self._ollama_client = None
         self._mode = "uninitialized"  # uninitialized | aya | mlx | ollama | mock
         self._aya_available = False  # Phase 3: aya-23 翻译模型可用性
+
+        # Phase 3 Backend 优化: 翻译缓存（LRU, 1000 条）
+        self._cache = TranslationCache(max_size=1000, ttl_seconds=3600)  # 1 小时过期
 
     # MARK: - BasePattern Protocol
 
@@ -219,6 +223,29 @@ class TranslatePattern(BasePattern):
         preserve_format = parameters.get("preserve_format", True)
         glossary = parameters.get("glossary", {})
 
+        # Phase 3 Backend 优化: 检查缓存
+        cached_translation = self._cache.get(text, target_language, source_language, style)
+        if cached_translation is not None:
+            logger.info(
+                f"🚀 缓存命中 | hit_rate={self._cache.hit_rate:.1%} | "
+                f"text_preview={text[:30]}..."
+            )
+            return {
+                "output": cached_translation,
+                "metadata": {
+                    "source_language": source_language,
+                    "target_language": target_language,
+                    "style": style,
+                    "preserve_format": preserve_format,
+                    "glossary_size": len(glossary),
+                    "original_length": len(text),
+                    "translation_length": len(cached_translation),
+                    "mode": self._mode,
+                    "cached": True,  # 标记为缓存结果
+                    "cache_stats": self._cache.stats,  # 缓存统计
+                },
+            }
+
         # Phase 3: 根据模式选择生成方法（优先使用 aya）
         if self._mode == "aya":
             translation = await self._translate_with_aya(
@@ -238,6 +265,13 @@ class TranslatePattern(BasePattern):
                 text, source_language, target_language, style, preserve_format, glossary
             )
 
+        # Phase 3 Backend 优化: 存入缓存
+        self._cache.put(text, target_language, translation, source_language, style)
+        logger.debug(
+            f"缓存存入 | cache_size={len(self._cache._cache)} | "
+            f"hit_rate={self._cache.hit_rate:.1%}"
+        )
+
         return {
             "output": translation,  # 统一输出格式
             "metadata": {
@@ -249,6 +283,8 @@ class TranslatePattern(BasePattern):
                 "original_length": len(text),
                 "translation_length": len(translation),
                 "mode": self._mode,
+                "cached": False,  # 标记为新翻译
+                "cache_stats": self._cache.stats,  # 缓存统计
             },
         }
 
