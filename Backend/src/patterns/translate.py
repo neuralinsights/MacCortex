@@ -651,3 +651,179 @@ Rules:
             output = "\n".join(lines[1:-1])
 
         return output.strip()
+
+    # MARK: - Streaming Support (Phase 3 Week 3)
+
+    async def execute_stream(self, text: str, parameters: Dict[str, Any]):
+        """
+        流式翻译（Server-Sent Events）
+
+        Phase 3 Week 3 Day 1 新增功能
+        返回 StreamingResponse，逐字发送翻译结果（类似 ChatGPT 打字效果）
+
+        Args:
+            text: 输入文本
+            parameters: 翻译参数（同 execute）
+
+        Returns:
+            StreamingResponse（text/event-stream）
+        """
+        from fastapi.responses import StreamingResponse
+        import json
+
+        async def event_generator():
+            """SSE 事件生成器"""
+            try:
+                # 1. 发送开始事件
+                yield f"event: start\n"
+                yield f"data: {json.dumps({'status': 'started', 'input_length': len(text)})}\n\n"
+                await asyncio.sleep(0.01)  # 确保事件顺序
+
+                # 2. 解析参数
+                target_language = parameters.get("target_language")
+                if not target_language:
+                    yield f"event: error\n"
+                    yield f"data: {json.dumps({'error': '缺少必填参数: target_language'})}\n\n"
+                    return
+
+                source_language = parameters.get("source_language", "auto")
+                style = parameters.get("style", "formal")
+
+                # 3. 检查缓存
+                cached_translation = self._cache.get(text, target_language, source_language, style)
+
+                if cached_translation is not None:
+                    # 缓存命中：模拟打字效果发送缓存结果
+                    yield f"event: cached\n"
+                    yield f"data: {json.dumps({'cached': True, 'hit_rate': self._cache.hit_rate})}\n\n"
+
+                    # 逐字发送（每次 5 个字符，50ms 延迟）
+                    chunk_size = 5
+                    for i in range(0, len(cached_translation), chunk_size):
+                        chunk = cached_translation[i:i+chunk_size]
+                        yield f"event: chunk\n"
+                        yield f"data: {json.dumps({'text': chunk})}\n\n"
+                        await asyncio.sleep(0.05)  # 50ms 打字延迟
+
+                    # 发送完成事件（包含元数据）
+                    metadata = {
+                        "source_language": source_language,
+                        "target_language": target_language,
+                        "style": style,
+                        "cached": True,
+                        "cache_stats": self._cache.stats,
+                        "mode": self._mode,
+                    }
+                    yield f"event: done\n"
+                    yield f"data: {json.dumps({'output': cached_translation, 'metadata': metadata})}\n\n"
+
+                else:
+                    # 缓存未命中：流式翻译
+                    yield f"event: translating\n"
+                    yield f"data: {json.dumps({'cached': False})}\n\n"
+
+                    # 根据模式选择流式方法
+                    if self._mode == "aya":
+                        async for chunk in self._translate_stream_aya(
+                            text, source_language, target_language, style, parameters
+                        ):
+                            yield f"event: chunk\n"
+                            yield f"data: {json.dumps({'text': chunk})}\n\n"
+                    else:
+                        # 非 aya 模式：回退到普通翻译 + 模拟流式
+                        logger.warning("流式翻译仅支持 aya 模式，回退到模拟流式")
+                        translation = await self.execute(text, parameters)
+                        full_text = translation["output"]
+
+                        # 模拟打字效果
+                        chunk_size = 5
+                        for i in range(0, len(full_text), chunk_size):
+                            chunk = full_text[i:i+chunk_size]
+                            yield f"event: chunk\n"
+                            yield f"data: {json.dumps({'text': chunk})}\n\n"
+                            await asyncio.sleep(0.05)
+
+                    # 获取完整翻译结果（用于缓存）
+                    # 注意：这里需要重新调用 execute 来获取元数据和缓存
+                    # 但为避免重复翻译，我们直接构造元数据
+                    full_translation = ""  # 从 chunk 累积
+
+                    # TODO: 改进：在流式过程中累积完整文本
+                    # 当前实现：发送完成事件但不包含完整文本（客户端自行累积）
+                    yield f"event: done\n"
+                    yield f"data: {json.dumps({'metadata': {'mode': self._mode, 'cached': False}})}\n\n"
+
+            except Exception as e:
+                logger.error(f"流式翻译错误: {e}")
+                yield f"event: error\n"
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
+            }
+        )
+
+    async def _translate_stream_aya(
+        self,
+        text: str,
+        source_language: str,
+        target_language: str,
+        style: str,
+        parameters: Dict[str, Any],
+    ):
+        """
+        使用 aya 模型进行流式翻译
+
+        Phase 3 Week 3 Day 1 新增
+        利用 Ollama 的流式 API 实时生成翻译
+
+        Yields:
+            str: 翻译文本片段
+        """
+        # 获取 aya 模型名称
+        models_response = await self._ollama_client.list()
+        installed_models = [m.model for m in models_response.models]
+        aya_model = next((m for m in installed_models if 'aya' in m), "aya:8b")
+
+        # 构建提示词
+        preserve_format = parameters.get("preserve_format", True)
+        glossary = parameters.get("glossary", {})
+        prompt = self._build_aya_prompt(
+            text, source_language, target_language, style, preserve_format, glossary
+        )
+
+        # 调用 Ollama 流式 API
+        full_text = ""
+        async for part in await self._ollama_client.generate(
+            model=aya_model,
+            prompt=prompt,
+            stream=True,  # 启用流式
+            options={
+                "temperature": 0.3,
+                "num_predict": min(len(text) * 3, 2048),
+                "top_p": 0.9,
+                "repeat_penalty": 1.1,
+            }
+        ):
+            # ollama 流式响应格式：{response: str, done: bool}
+            if hasattr(part, 'response'):
+                chunk = part.response
+            elif isinstance(part, dict):
+                chunk = part.get('response', '')
+            else:
+                chunk = str(part)
+
+            if chunk:
+                full_text += chunk
+                yield chunk
+
+        # 流式完成后：存入缓存
+        if full_text:
+            cleaned_text = self._extract_translation(full_text)
+            self._cache.put(text, target_language, cleaned_text, source_language, style)
+            logger.debug(f"流式翻译完成，已存入缓存 | length={len(cleaned_text)}")

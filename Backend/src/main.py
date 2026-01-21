@@ -499,6 +499,82 @@ async def execute_pattern(request: PatternRequest):
         )
 
 
+@app.post("/execute/stream", summary="Execute pattern with streaming (SSE)")
+async def execute_pattern_stream(request: PatternRequest):
+    """
+    流式执行 Pattern（Server-Sent Events）
+
+    Phase 3 Week 3 Day 1 新增功能
+    支持实时流式输出，客户端可逐字接收翻译结果（类似 ChatGPT 打字效果）
+
+    当前仅支持 translate pattern + aya 模式
+    其他 pattern 或模式将回退到模拟流式（分块发送）
+
+    SSE 事件格式：
+    - event: start -> 开始翻译
+    - event: cached -> 缓存命中
+    - event: translating -> 开始生成
+    - event: chunk -> 文本片段（逐字发送）
+    - event: done -> 完成
+    - event: error -> 错误
+
+    使用示例：
+    ```bash
+    curl -N http://localhost:8000/execute/stream \\
+      -H "Content-Type: application/json" \\
+      -d '{
+        "pattern_id": "translate",
+        "text": "Hello, how are you?",
+        "parameters": {"target_language": "zh-CN", "style": "formal"}
+      }'
+    ```
+    """
+    from security.audit_logger import get_audit_logger
+    audit_logger = get_audit_logger()
+
+    try:
+        logger.info(f"📥 收到流式请求: pattern={request.pattern_id}, request_id={request.request_id}")
+
+        # 验证：仅支持 translate pattern
+        if request.pattern_id != "translate":
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=400,
+                content={"error": "流式输出仅支持 translate pattern"}
+            )
+
+        registry: PatternRegistry = app.state.registry
+        pattern = registry.get_pattern(request.pattern_id)
+
+        if not pattern:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"Pattern not found: {request.pattern_id}"}
+            )
+
+        # 调用流式执行方法（translate.py 的 execute_stream）
+        return await pattern.execute_stream(request.text, request.parameters)
+
+    except Exception as e:
+        logger.error(f"❌ 流式执行失败: {e}", exc_info=True)
+
+        # 记录审计日志
+        audit_logger.log_pattern_execution(
+            pattern_id=request.pattern_id,
+            request_id=request.request_id,
+            success=False,
+            error=str(e),
+            duration=0,
+        )
+
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+
 @app.post("/execute/batch", response_model=BatchPatternResponse, summary="Execute batch translation")
 async def execute_pattern_batch(request: BatchPatternRequest):
     """
