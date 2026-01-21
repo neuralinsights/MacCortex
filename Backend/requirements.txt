@@ -28,6 +28,9 @@ ollama==0.6.1
 # Vector Database
 chromadb==0.4.22
 
+# Search (Phase 2 Week 4 Day 17)
+duckduckgo-search==5.0.0
+
 # Utilities
 python-dotenv==1.0.0
 loguru==0.7.2

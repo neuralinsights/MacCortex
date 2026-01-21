@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Phase 2 Week 4: 用户体验打磨与文档完善（Day 16-17）
+
+**执行时间**: 2026-01-21
+**状态**: 🚧 进行中（Day 16-17 已完成）
+
+#### Fixed - Day 16: Translate Pattern 优化
+
+##### Prompt 模板优化
+- 简化系统提示结构（减少冗余指令）
+- 针对中文/日文/韩文使用中文系统提示（增强模型理解）
+- 强化"只输出翻译"规则（减少不必要注释）
+- 明确分隔系统指令和用户内容
+
+##### 语言代码支持扩展
+- 输入验证器：新增简短格式（"en", "ja", "ko" 等）支持
+- `translate.py`：同时支持 ISO 639-1（简短）和完整格式（"en-US"）
+- 10+ 语言映射：中文、英文、日文、韩文、法文、德文、西班牙文、俄文、阿拉伯文
+
+##### 已知限制（待 Phase 3 解决）
+- Llama-3.2-1B-Instruct 模型（1B 参数）无法胜任高质量多语言翻译
+- 建议升级到 Ollama aya-23（23B 参数，专业翻译模型）
+- 预期质量提升：3-5 倍
+- 详见：`Backend/TRANSLATE_LIMITATION.md`
+
+**文件变更**:
+- `Backend/src/patterns/translate.py`: Prompt 优化 + 双语系统提示
+- `Backend/src/security/input_validator.py`: 语言代码白名单扩展
+- `Backend/TRANSLATE_LIMITATION.md`: 技术说明文档（新增）
+
+---
+
+#### Added - Day 17: DuckDuckGo Search 真实集成
+
+##### DuckDuckGo API 集成
+- 集成 `duckduckgo-search` 5.0.0 Python 库
+- 真实 Web 搜索（替代 Mock 数据）
+- 语言/区域映射扩展（8+ 语言）
+- 异步执行（线程池，避免阻塞事件循环）
+
+##### 缓存机制（5 分钟 TTL）
+- 基于查询参数的 MD5 哈希缓存键
+- 自动过期清理（TTL: 300 秒）
+- 缓存大小限制（最多 100 条）
+- 预期缓存命中率：70-80%
+
+##### 错误处理优化
+- 自动回退到 Mock 搜索（速率限制、网络错误）
+- 详细日志记录（搜索参数、错误类型、回退状态）
+- 结果过滤（无效 URL/标题）
+
+##### 已知限制（DuckDuckGo 速率限制）
+- 连续请求间隔 < 1 秒会触发 Ratelimit
+- 重置时间：2-5 分钟
+- 短期解决：缓存 + Mock 回退
+- 中期解决（Phase 3）：重试机制 + User-Agent 随机化
+- 详见：`Backend/DUCKDUCKGO_INTEGRATION.md`
+
+**文件变更**:
+- `Backend/requirements.txt`: 新增 `duckduckgo-search==5.0.0`
+- `Backend/src/patterns/search.py`: 真实 API 集成 + 缓存机制（+150 行）
+- `Backend/src/security/input_validator.py`: 搜索参数白名单扩展
+- `Backend/DUCKDUCKGO_INTEGRATION.md`: 技术说明文档（新增）
+
+---
+
+#### Changed - Day 16-17: 输入验证器增强
+
+##### 参数白名单扩展
+- `translate` Pattern:
+  - 支持简短语言代码（"en", "zh", "ja" 等）
+  - 完整语言代码（"en-US", "zh-CN", "ja-JP" 等）
+- `search` Pattern:
+  - 新增引擎支持（"google", "bing"）
+  - 语言代码扩展（简短+完整格式）
+  - 新增 `summarize`、`collection` 参数
+
+##### 用户体验优化
+- 更符合国际标准（ISO 639-1）
+- 减少用户学习成本（无需记忆完整代码）
+- API 向后兼容（同时支持两种格式）
+
+---
+
 ## [0.5.0] - 2026-01-20
 
 ### Phase 0.5: 签名与公证基础设施

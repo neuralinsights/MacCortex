@@ -58,9 +58,17 @@ class InputValidator:
         },
         "search": {
             "search_type": ["web", "semantic", "hybrid"],
-            "engine": ["duckduckgo"],
+            "engine": ["duckduckgo", "google", "bing"],  # Phase 2 Week 4 Day 17: 扩展引擎支持
             "num_results": list(range(1, 21)),  # 1-20
-            "language": ["zh-CN", "en-US", "ja-JP", "ko-KR", "auto"],
+            "language": [
+                # 完整格式
+                "zh-CN", "zh-TW", "en-US", "ja-JP", "ko-KR", "es-ES", "fr-FR", "de-DE",
+                # 简短格式（Phase 2 Week 4 Day 17：用户体验优化）
+                "zh", "en", "ja", "ko", "es", "fr", "de",
+                "auto"
+            ],
+            "summarize": [True, False],
+            "collection": str,  # 语义搜索集合名（任意字符串）
         },
     }
 

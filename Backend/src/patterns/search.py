@@ -13,7 +13,9 @@
 # Web 搜索 + 语义搜索（本地知识库查询）
 
 import asyncio
-from typing import Any, Dict, List
+import hashlib
+import time
+from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from .base import BasePattern
@@ -38,6 +40,10 @@ class SearchPattern(BasePattern):
         self._ollama_client = None
         self._vector_db = None  # ChromaDB 客户端
         self._mode = "uninitialized"  # uninitialized | mlx | ollama | mock
+
+        # 缓存机制（Phase 2 Week 4 Day 17）
+        self._search_cache: Dict[str, tuple[List[Dict[str, Any]], float]] = {}
+        self._cache_ttl = 300  # 5 分钟 TTL
 
     # MARK: - BasePattern Protocol
 
@@ -216,28 +222,99 @@ class SearchPattern(BasePattern):
             raise ValueError(f"不支持的搜索引擎: {engine}")
 
     async def _search_duckduckgo(self, query: str, num_results: int, language: str) -> List[Dict[str, Any]]:
-        """DuckDuckGo 搜索"""
+        """
+        DuckDuckGo 搜索（Phase 2 Week 4 Day 17 优化）
+
+        改进：
+        1. 5 分钟缓存（减少 API 调用）
+        2. 更好的错误处理（超时、速率限制）
+        3. 语言映射扩展（支持更多语言）
+        4. 日志记录优化
+        """
+        # 1. 检查缓存
+        cache_key = self._generate_cache_key(query, num_results, language)
+        cached_result = self._get_from_cache(cache_key)
+        if cached_result is not None:
+            logger.debug(f"🚀 使用缓存结果: {query} ({len(cached_result)} 条)")
+            return cached_result
+
+        # 2. 执行搜索
         try:
             from duckduckgo_search import DDGS
 
+            # 语言/区域映射（Phase 2 Week 4 Day 17 扩展）
+            region_map = {
+                "zh-CN": "cn-zh",  # 中国简体
+                "zh": "cn-zh",
+                "en-US": "us-en",  # 美国英文
+                "en": "us-en",
+                "ja-JP": "jp-jp",  # 日本
+                "ja": "jp-jp",
+                "ko-KR": "kr-kr",  # 韩国
+                "ko": "kr-kr",
+                "auto": "wt-wt",    # 全球（无地区限制）
+            }
+            region = region_map.get(language, "wt-wt")
+
+            logger.info(f"🔍 DuckDuckGo 搜索: '{query}' (region={region}, num={num_results})")
+
+            # 执行搜索（同步方法，需要在线程池中运行以避免阻塞）
+            loop = asyncio.get_event_loop()
             results = []
-            with DDGS() as ddgs:
-                for i, result in enumerate(ddgs.text(query, region="cn-zh" if language == "zh-CN" else "us-en", max_results=num_results)):
-                    results.append(
-                        {
-                            "title": result.get("title", ""),
-                            "url": result.get("href", ""),
-                            "snippet": result.get("body", ""),
-                            "source": "duckduckgo",
-                            "rank": i + 1,
-                        }
-                    )
+
+            def _sync_search():
+                """同步搜索函数（在线程池中运行）"""
+                nonlocal results
+                try:
+                    with DDGS() as ddgs:
+                        search_results = ddgs.text(
+                            keywords=query,
+                            region=region,
+                            max_results=num_results * 2,  # 多获取一些以防过滤后不够
+                        )
+                        for i, result in enumerate(search_results):
+                            # 过滤无效结果
+                            if not result.get("title") or not result.get("href"):
+                                continue
+
+                            results.append(
+                                {
+                                    "title": result.get("title", ""),
+                                    "url": result.get("href", ""),
+                                    "snippet": result.get("body", ""),
+                                    "source": "duckduckgo",
+                                    "rank": i + 1,
+                                }
+                            )
+
+                            # 限制结果数量
+                            if len(results) >= num_results:
+                                break
+                except Exception as e:
+                    logger.error(f"DuckDuckGo 搜索内部错误: {e}")
+                    raise
+
+            # 在线程池中执行（避免阻塞事件循环）
+            await loop.run_in_executor(None, _sync_search)
+
+            if not results:
+                logger.warning(f"DuckDuckGo 搜索无结果: '{query}'")
+                return []
+
+            logger.info(f"✅ DuckDuckGo 搜索成功: {len(results)} 条结果")
+
+            # 3. 缓存结果
+            self._save_to_cache(cache_key, results)
+
             return results
+
         except ImportError:
-            logger.warning("duckduckgo_search 未安装，使用 Mock 搜索")
+            logger.error("duckduckgo_search 未安装（但已在 requirements.txt 中）")
+            logger.info("  ⚠️  回退到 Mock 搜索")
             return await self._mock_web_search(query, num_results)
         except Exception as e:
-            logger.error(f"DuckDuckGo 搜索失败: {e}")
+            logger.error(f"DuckDuckGo 搜索失败: {type(e).__name__}: {e}")
+            logger.info("  ⚠️  回退到 Mock 搜索")
             return await self._mock_web_search(query, num_results)
 
     async def _search_google(self, query: str, num_results: int, language: str) -> List[Dict[str, Any]]:
@@ -359,3 +436,47 @@ class SearchPattern(BasePattern):
         else:
             # Mock 总结
             return f"根据搜索结果，关于 '{query}' 的主要信息如下：{results[0].get('title', '')}。详见搜索结果。"
+
+    # MARK: - 缓存辅助方法（Phase 2 Week 4 Day 17）
+
+    def _generate_cache_key(self, query: str, num_results: int, language: str) -> str:
+        """生成缓存键（基于查询参数的哈希）"""
+        key_string = f"{query}|{num_results}|{language}"
+        return hashlib.md5(key_string.encode("utf-8")).hexdigest()
+
+    def _get_from_cache(self, cache_key: str) -> Optional[List[Dict[str, Any]]]:
+        """从缓存获取结果（检查 TTL）"""
+        if cache_key not in self._search_cache:
+            return None
+
+        cached_results, cached_time = self._search_cache[cache_key]
+
+        # 检查是否过期（5 分钟 TTL）
+        if time.time() - cached_time > self._cache_ttl:
+            # 过期，删除缓存
+            del self._search_cache[cache_key]
+            return None
+
+        return cached_results
+
+    def _save_to_cache(self, cache_key: str, results: List[Dict[str, Any]]):
+        """保存结果到缓存"""
+        self._search_cache[cache_key] = (results, time.time())
+
+        # 清理过期缓存（限制缓存大小）
+        if len(self._search_cache) > 100:
+            self._cleanup_expired_cache()
+
+    def _cleanup_expired_cache(self):
+        """清理过期缓存条目"""
+        current_time = time.time()
+        expired_keys = [
+            key
+            for key, (_, cached_time) in self._search_cache.items()
+            if current_time - cached_time > self._cache_ttl
+        ]
+
+        for key in expired_keys:
+            del self._search_cache[key]
+
+        logger.debug(f"🧹 清理过期缓存: 删除 {len(expired_keys)} 条，剩余 {len(self._search_cache)} 条")
