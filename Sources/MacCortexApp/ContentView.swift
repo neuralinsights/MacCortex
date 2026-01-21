@@ -49,9 +49,8 @@ struct MainView: View {
                 }
                 .tag(0)
 
-            // Phase 3 Week 2 Day 3-4: 批量翻译（开发中）
-            Text("批量翻译（开发中）")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Phase 3 Week 2 Day 3-4: 批量翻译界面
+            BatchTranslationView()
                 .tabItem {
                     Label("批量", systemImage: "list.bullet")
                 }
