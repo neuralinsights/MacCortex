@@ -316,6 +316,23 @@ struct MainView: View {
             SettingsView()
                 .environment(appState)
         }
+        .sheet(isPresented: Binding(
+            get: { appState.showRiskConfirmation },
+            set: { _ in }
+        )) {
+            // Phase 2 Week 2 Day 8-9: 风险确认对话框
+            if let assessment = appState.currentRiskAssessment {
+                RiskConfirmationDialog(
+                    assessment: assessment,
+                    onConfirm: {
+                        appState.confirmRiskOperation()
+                    },
+                    onCancel: {
+                        appState.cancelRiskOperation()
+                    }
+                )
+            }
+        }
     }
 }
 

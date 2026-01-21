@@ -68,6 +68,11 @@ class AppState {
     var showFloatingToolbar: Bool = false
     var showSettings: Bool = false
 
+    // MARK: - Phase 2 Week 2 Day 8-9: 风险评估与确认
+    var showRiskConfirmation: Bool = false
+    var currentRiskAssessment: RiskAssessment? = nil
+    var riskConfirmationResult: Bool? = nil
+
     init() {
         checkPermissions()
     }
@@ -119,22 +124,65 @@ class AppState {
 
     // MARK: - Phase 2: Pattern 执行
 
-    /// 执行 Pattern（调用 Backend API）
+    /// 执行 Pattern（调用 Backend API，集成风险评估）
     /// - Parameters:
     ///   - patternId: Pattern ID
     ///   - text: 输入文本
     ///   - parameters: 参数字典
+    ///   - source: 输入来源（默认为用户输入）
+    ///   - outputTarget: 输出目标（默认为显示）
     /// - Returns: Pattern 执行结果
     @MainActor
-    func executePattern(_ patternId: String, text: String, parameters: [String: String] = [:]) async -> PatternResult {
+    func executePattern(
+        _ patternId: String,
+        text: String,
+        parameters: [String: String] = [:],
+        source: OperationTask.InputSource = .user,
+        outputTarget: OperationTask.OutputTarget = .display
+    ) async -> PatternResult {
         isProcessingPattern = true
         currentPatternId = patternId
         lastError = nil
 
         let startTime = Date()
 
+        // Phase 2 Week 2 Day 8-9: 风险评估
+        let task = OperationTask(
+            patternId: patternId,
+            text: text,
+            parameters: parameters,
+            source: source,
+            outputTarget: outputTarget
+        )
+
+        let assessment = TrustEngine.shared.assessRisk(for: task)
+
+        // 如果需要确认，显示确认对话框
+        if assessment.requiresConfirmation {
+            let confirmed = await requestRiskConfirmation(assessment)
+
+            if !confirmed {
+                // 用户取消操作
+                let result = PatternResult(
+                    patternId: patternId,
+                    output: "操作已取消",
+                    success: false,
+                    duration: Date().timeIntervalSince(startTime)
+                )
+
+                lastPatternResult = result
+                isProcessingPattern = false
+                currentPatternId = nil
+
+                return result
+            }
+        }
+
+        // 记录操作到历史
+        TrustEngine.shared.recordOperation(task)
+
+        // 调用 Backend API
         do {
-            // 调用 Backend API（Phase 2 Week 2 集成）
             let apiClient = APIClient.shared
             let response = try await apiClient.executePattern(
                 patternId: patternId,
@@ -144,7 +192,6 @@ class AppState {
 
             let duration = Date().timeIntervalSince(startTime)
 
-            // 构建结果
             let result = PatternResult(
                 patternId: patternId,
                 output: response.output,
@@ -176,6 +223,43 @@ class AppState {
 
             return result
         }
+    }
+
+    /// 请求风险确认
+    /// - Parameter assessment: 风险评估结果
+    /// - Returns: 用户是否批准
+    @MainActor
+    private func requestRiskConfirmation(_ assessment: RiskAssessment) async -> Bool {
+        // 设置当前风险评估
+        currentRiskAssessment = assessment
+        showRiskConfirmation = true
+        riskConfirmationResult = nil
+
+        // 等待用户响应
+        while riskConfirmationResult == nil {
+            try? await Task.sleep(nanoseconds: 100_000_000)  // 0.1 秒
+        }
+
+        let result = riskConfirmationResult ?? false
+
+        // 清理状态
+        showRiskConfirmation = false
+        currentRiskAssessment = nil
+        riskConfirmationResult = nil
+
+        return result
+    }
+
+    /// 用户确认风险操作
+    @MainActor
+    func confirmRiskOperation() {
+        riskConfirmationResult = true
+    }
+
+    /// 用户取消风险操作
+    @MainActor
+    func cancelRiskOperation() {
+        riskConfirmationResult = false
     }
 
     // MARK: - Phase 2: 场景检测
