@@ -27,11 +27,19 @@ class TranslationViewModel: ObservableObject {
     // 历史记录（最近 20 条）
     @Published var history: [TranslationHistory] = []
 
+    // Phase 3 Week 3 Day 2: 流式翻译支持
+    @Published var isStreaming: Bool = false
+    @Published var streamProgress: String = ""
+    @Published var useStreamingMode: Bool = false  // 流式模式开关
+
     // MARK: - Private Properties
 
     private let client = BackendClient.shared
     private var debounceTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
+
+    // Phase 3 Week 3 Day 2: SSE 客户端
+    private var sseClient: SSEClient?
 
     // MARK: - Initialization
 
@@ -240,5 +248,169 @@ class TranslationViewModel: ObservableObject {
         if history.count > 20 {
             history = Array(history.prefix(20))
         }
+    }
+
+    // MARK: - Streaming Support (Phase 3 Week 3 Day 2)
+
+    /// 流式翻译
+    func translateStream() async {
+        guard !inputText.isEmpty else {
+            outputText = ""
+            stats = nil
+            return
+        }
+
+        isStreaming = true
+        isTranslating = true
+        outputText = ""
+        streamProgress = ""
+        errorMessage = nil
+
+        let url = URL(string: "http://localhost:8000/execute/stream")!
+
+        // 构建请求体
+        let requestBody: [String: Any] = [
+            "pattern_id": "translate",
+            "text": inputText,
+            "parameters": [
+                "target_language": targetLanguage.code,
+                "source_language": sourceLanguage.code,
+                "style": style.rawValue
+            ]
+        ]
+
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: requestBody) else {
+            errorMessage = "请求构建失败"
+            isStreaming = false
+            isTranslating = false
+            return
+        }
+
+        // 创建 SSE 客户端
+        sseClient = SSEClient()
+
+        // 处理 SSE 事件
+        sseClient?.onEvent = { [weak self] event in
+            Task { @MainActor in
+                self?.handleSSEEvent(event)
+            }
+        }
+
+        // 处理完成
+        sseClient?.onComplete = { [weak self] in
+            Task { @MainActor in
+                self?.isStreaming = false
+                self?.isTranslating = false
+                self?.streamProgress = "完成！"
+            }
+        }
+
+        // 处理错误
+        sseClient?.onError = { [weak self] error in
+            Task { @MainActor in
+                self?.errorMessage = "流式翻译失败: \(error.localizedDescription)"
+                self?.isStreaming = false
+                self?.isTranslating = false
+            }
+        }
+
+        // 连接并开始接收
+        sseClient?.connect(url: url, body: bodyData)
+    }
+
+    /// 停止流式翻译
+    func stopStreaming() {
+        sseClient?.disconnect()
+        isStreaming = false
+        isTranslating = false
+        streamProgress = "已停止"
+    }
+
+    /// 处理 SSE 事件
+    private func handleSSEEvent(_ event: SSEEvent) {
+        switch event.event {
+        case "start":
+            streamProgress = "开始翻译..."
+
+        case "cached":
+            // 缓存命中
+            if let data = event.data.data(using: .utf8),
+               let json = try? JSONDecoder().decode([String: Any].self, from: data) {
+                isCached = json["cached"] as? Bool ?? false
+                if isCached {
+                    streamProgress = "缓存命中！"
+                }
+            }
+
+        case "translating":
+            isCached = false
+            streamProgress = "翻译中..."
+
+        case "chunk":
+            // 接收文本片段
+            if let data = event.data.data(using: .utf8),
+               let json = try? JSONDecoder().decode([String: String].self, from: data),
+               let text = json["text"] {
+                outputText += text
+            }
+
+        case "done":
+            // 翻译完成
+            streamProgress = "完成！"
+
+            if let data = event.data.data(using: .utf8),
+               let json = try? JSONDecoder().decode([String: Any].self, from: data) {
+
+                // 提取完整输出（如果有）
+                if let output = json["output"] as? String {
+                    outputText = output
+                }
+
+                // 提取元数据
+                if let metadata = json["metadata"] as? [String: Any] {
+                    let cached = metadata["cached"] as? Bool ?? false
+                    let mode = metadata["mode"] as? String
+
+                    // 更新统计
+                    if let cacheStats = metadata["cache_stats"] as? [String: Any] {
+                        stats = TranslationStats(
+                            duration: 0.0,  // 流式没有总耗时
+                            hitRate: (cacheStats["hit_rate"] as? Double ?? 0.0) * 100,
+                            timeSaved: 0.0,
+                            cacheSize: cacheStats["cache_size"] as? Int ?? 0,
+                            totalHits: cacheStats["hits"] as? Int ?? 0,
+                            totalMisses: cacheStats["misses"] as? Int ?? 0
+                        )
+                    }
+
+                    // 添加到历史记录
+                    addToHistory(
+                        sourceText: inputText,
+                        translatedText: outputText,
+                        duration: 0.0,
+                        cached: cached
+                    )
+                }
+            }
+
+        case "error":
+            // 错误处理
+            if let data = event.data.data(using: .utf8),
+               let json = try? JSONDecoder().decode([String: String].self, from: data),
+               let error = json["error"] {
+                errorMessage = error
+            }
+
+        default:
+            break
+        }
+    }
+}
+
+// MARK: - Helper Extensions
+
+extension JSONDecoder {
+    func decode<T>(_ type: T.Type, from data: Data) throws -> T where T: Decodable {
+        return try self.decode(type, from: data)
     }
 }
