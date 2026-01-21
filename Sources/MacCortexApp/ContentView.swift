@@ -38,8 +38,44 @@ struct MainView: View {
     @State private var showSettings = false
     @State private var showUndoHistory = false  // Phase 2 Week 2 Day 10: 撤销历史
     @State private var showMCPServerList = false  // Phase 2 Week 3 Day 11-12: MCP 服务器列表
+    @State private var selectedTab = 0  // Phase 3 Week 2: 标签选择
 
     var body: some View {
+        TabView(selection: $selectedTab) {
+            // Phase 3 Week 2 Day 1-2: 翻译界面
+            TranslationView()
+                .tabItem {
+                    Label("翻译", systemImage: "character.bubble")
+                }
+                .tag(0)
+
+            // Phase 3 Week 2 Day 3-4: 批量翻译（开发中）
+            Text("批量翻译（开发中）")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("批量", systemImage: "list.bullet")
+                }
+                .tag(1)
+
+            // Phase 3 Week 2 Day 5: 缓存统计（开发中）
+            Text("缓存统计（开发中）")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("统计", systemImage: "chart.bar")
+                }
+                .tag(2)
+
+            // 原有的权限状态页面
+            permissionsView
+                .tabItem {
+                    Label("权限", systemImage: "lock.shield")
+                }
+                .tag(3)
+        }
+    }
+
+    // 权限状态视图（原有内容）
+    private var permissionsView: some View {
         NavigationView {
             VStack(spacing: 30) {
                 // 顶部标题区
@@ -52,12 +88,12 @@ struct MainView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
-                    Text("Phase 2 - 开发中")
+                    Text("Phase 3 - aya-23 翻译模型")
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.2))
-                        .foregroundColor(.blue)
+                        .background(Color.green.opacity(0.2))
+                        .foregroundColor(.green)
                         .cornerRadius(4)
                 }
 
