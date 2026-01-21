@@ -1,0 +1,29 @@
+# MacCortex Phase 4 - Swarm Intelligence Dependencies
+
+# LangGraph 核心（使用最新版本）
+langgraph>=1.0.0
+langchain-core>=1.0.0
+langchain-anthropic>=1.0.0
+langchain-community>=0.3.0
+
+# 检查点存储（LangGraph 1.0+ 需要单独安装）
+langgraph-checkpoint-sqlite>=3.0.0  # SQLite checkpointer for persistence
+
+# 工具
+duckduckgo-search>=8.0.0
+rich>=13.0.0
+
+# 异步支持
+aiofiles==24.1.0
+
+# 现有依赖（复用 - 从 requirements.txt 继承）
+fastapi==0.115.6
+uvicorn==0.34.0
+pydantic==2.10.5
+httpx==0.28.1
+python-dotenv==1.0.1
+
+# 测试
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
