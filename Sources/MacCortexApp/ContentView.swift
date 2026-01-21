@@ -50,12 +50,12 @@ struct MainView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
-                    Text("Phase 1 - 开发中")
+                    Text("Phase 2 - 开发中")
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.2))
-                        .foregroundColor(.orange)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
                         .cornerRadius(4)
                 }
 
@@ -136,10 +136,90 @@ struct MainView: View {
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(10)
 
+                // Phase 2: 功能测试区
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack {
+                        Image(systemName: "testtube.2")
+                            .foregroundColor(.blue)
+                        Text("Phase 2 功能测试")
+                            .font(.headline)
+                    }
+
+                    // 浮动工具栏开关
+                    Toggle("显示浮动工具栏", isOn: Binding(
+                        get: { appState.showFloatingToolbar },
+                        set: { appState.showFloatingToolbar = $0 }
+                    ))
+                    .toggleStyle(.switch)
+
+                    // 场景检测测试
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("场景检测测试")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            ForEach(DetectedScene.allCases.prefix(4), id: \.self) { scene in
+                                Button(action: {
+                                    appState.updateDetectedScene(scene, confidence: Double.random(in: 0.75...0.95))
+                                }) {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: scene.icon)
+                                            .font(.system(size: 16))
+                                        Text(scene.rawValue)
+                                            .font(.system(size: 9))
+                                    }
+                                    .frame(width: 60, height: 50)
+                                    .background(appState.detectedScene == scene ? Color.blue.opacity(0.2) : Color.secondary.opacity(0.1))
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    // 信任等级测试
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("信任等级切换")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            ForEach(TrustLevel.allCases, id: \.self) { level in
+                                Button(action: {
+                                    appState.setTrustLevel(level)
+                                }) {
+                                    Text(level.displayName)
+                                        .font(.system(size: 10))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(appState.currentTrustLevel == level ? level.color.opacity(0.3) : Color.secondary.opacity(0.1))
+                                        .foregroundColor(appState.currentTrustLevel == level ? level.color : .secondary)
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color.blue.opacity(0.05))
+                .cornerRadius(10)
+
                 Spacer()
             }
             .padding()
             .navigationTitle("MacCortex")
+            .overlay(
+                // 浮动工具栏叠加层
+                Group {
+                    if appState.showFloatingToolbar {
+                        FloatingToolbarView()
+                            .position(x: 200, y: 100)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            )
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     Button(action: {
