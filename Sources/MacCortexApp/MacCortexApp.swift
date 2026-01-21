@@ -56,6 +56,12 @@ struct MacCortexApp: App {
                 }
             }
         }
+
+        // Phase 3 Week 3 后续: 偏好设置窗口（Cmd+,）
+        Settings {
+            SettingsView()
+                .environment(appState)
+        }
     }
 }
 

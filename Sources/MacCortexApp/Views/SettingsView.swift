@@ -1,0 +1,604 @@
+//
+//  SettingsView.swift
+//  MacCortex
+//
+//  Phase 3 Week 3 后续 - 偏好设置界面
+//  Created on 2026-01-22
+//
+
+import SwiftUI
+
+/// 偏好设置视图
+///
+/// 包含 4 个设置 Tab：
+/// 1. 通用（General）- 默认语言对、风格、流式模式
+/// 2. 剪贴板（Clipboard）- 启用、最小长度、过滤规则
+/// 3. 快捷键（Shortcuts）- 全局快捷键配置
+/// 4. 高级（Advanced）- 缓存大小、Backend URL、调试选项
+struct SettingsView: View {
+    @StateObject private var settings = SettingsManager.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        TabView {
+            // Tab 1: 通用设置
+            GeneralSettingsView()
+                .tabItem {
+                    Label("通用", systemImage: "gear")
+                }
+                .tag(0)
+
+            // Tab 2: 剪贴板设置
+            ClipboardSettingsView()
+                .tabItem {
+                    Label("剪贴板", systemImage: "doc.on.clipboard")
+                }
+                .tag(1)
+
+            // Tab 3: 快捷键设置
+            ShortcutsSettingsView()
+                .tabItem {
+                    Label("快捷键", systemImage: "command")
+                }
+                .tag(2)
+
+            // Tab 4: 高级设置
+            AdvancedSettingsView()
+                .tabItem {
+                    Label("高级", systemImage: "slider.horizontal.3")
+                }
+                .tag(3)
+        }
+        .frame(width: 500, height: 400)
+    }
+}
+
+// MARK: - Tab 1: 通用设置
+
+struct GeneralSettingsView: View {
+    @StateObject private var settings = SettingsManager.shared
+
+    var body: some View {
+        Form {
+            Section("默认语言") {
+                Picker("源语言", selection: $settings.defaultSourceLanguage) {
+                    ForEach(Language.allCases) { language in
+                        HStack {
+                            Text(language.flag)
+                            Text(language.displayName)
+                        }
+                        .tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Picker("目标语言", selection: $settings.defaultTargetLanguage) {
+                    ForEach(Language.allCases.filter { $0 != .auto }) { language in
+                        HStack {
+                            Text(language.flag)
+                            Text(language.displayName)
+                        }
+                        .tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+
+            Section("默认风格") {
+                Picker("翻译风格", selection: $settings.defaultStyle) {
+                    ForEach(TranslationStyle.allCases) { style in
+                        HStack {
+                            Image(systemName: style.icon)
+                            Text(style.displayName)
+                        }
+                        .tag(style)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("翻译模式") {
+                Toggle("默认使用流式模式", isOn: $settings.defaultUseStreaming)
+                    .help("启用后，翻译结果将逐字显示（类似 ChatGPT）")
+
+                Toggle("自动保存翻译历史", isOn: $settings.autoSaveHistory)
+                    .help("自动保存最近 20 条翻译记录")
+            }
+
+            Section("界面") {
+                Toggle("启动时显示主窗口", isOn: $settings.showMainWindowOnLaunch)
+                    .help("关闭后，启动时仅显示菜单栏图标")
+
+                Picker("主题", selection: $settings.appTheme) {
+                    Text("系统默认").tag(AppTheme.system)
+                    Text("浅色").tag(AppTheme.light)
+                    Text("深色").tag(AppTheme.dark)
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// MARK: - Tab 2: 剪贴板设置
+
+struct ClipboardSettingsView: View {
+    @StateObject private var settings = SettingsManager.shared
+
+    var body: some View {
+        Form {
+            Section("剪贴板监听") {
+                Toggle("启用剪贴板监听", isOn: $settings.clipboardMonitorEnabled)
+                    .help("自动检测剪贴板文本变化并翻译")
+
+                HStack {
+                    Text("最小触发长度")
+                    Spacer()
+                    TextField("", value: $settings.clipboardMinimumLength, format: .number)
+                        .frame(width: 60)
+                        .textFieldStyle(.roundedBorder)
+                    Text("字符")
+                }
+                .disabled(!settings.clipboardMonitorEnabled)
+
+                HStack {
+                    Text("轮询间隔")
+                    Spacer()
+                    Slider(value: $settings.clipboardPollingInterval, in: 0.3...2.0, step: 0.1) {
+                        Text("轮询间隔")
+                    }
+                    Text("\(settings.clipboardPollingInterval, specifier: "%.1f")s")
+                        .frame(width: 40)
+                }
+                .disabled(!settings.clipboardMonitorEnabled)
+            }
+
+            Section("过滤规则") {
+                Toggle("排除 URL", isOn: $settings.clipboardExcludeURLs)
+                    .help("不翻译以 http:// 或 https:// 开头的文本")
+
+                Toggle("排除纯数字", isOn: $settings.clipboardExcludeNumbers)
+                    .help("不翻译只包含数字的文本")
+
+                Toggle("排除代码片段", isOn: $settings.clipboardExcludeCode)
+                    .help("不翻译包含大量符号的代码")
+
+                HStack {
+                    Text("最大长度限制")
+                    Spacer()
+                    TextField("", value: $settings.clipboardMaxLength, format: .number)
+                        .frame(width: 80)
+                        .textFieldStyle(.roundedBorder)
+                    Text("字符")
+                }
+                .help("超过此长度的文本将被忽略")
+            }
+
+            Section("自动操作") {
+                Toggle("复制翻译结果到剪贴板", isOn: $settings.clipboardAutoCopyResult)
+                    .help("翻译完成后自动复制结果")
+
+                Toggle("翻译后显示通知", isOn: $settings.clipboardShowNotification)
+                    .help("翻译完成后显示系统通知")
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+// MARK: - Tab 3: 快捷键设置
+
+struct ShortcutsSettingsView: View {
+    @StateObject private var settings = SettingsManager.shared
+
+    var body: some View {
+        Form {
+            Section("全局快捷键") {
+                Toggle("启用全局快捷键", isOn: $settings.globalHotKeyEnabled)
+                    .help("允许在任何应用中使用快捷键")
+                    .onChange(of: settings.globalHotKeyEnabled) { oldValue, newValue in
+                        GlobalHotKeyManager.shared.isEnabled = newValue
+                    }
+
+                HStack {
+                    Text("显示悬浮窗口")
+                    Spacer()
+                    KeyboardShortcutView(
+                        modifiers: $settings.floatingPanelModifiers,
+                        key: $settings.floatingPanelKey
+                    )
+                }
+                .disabled(!settings.globalHotKeyEnabled)
+                .help("当前: Cmd+Shift+T（自定义功能开发中）")
+            }
+
+            Section("应用内快捷键") {
+                VStack(alignment: .leading, spacing: 8) {
+                    ShortcutRow(name: "翻译", shortcut: "Cmd+Enter")
+                    ShortcutRow(name: "清空", shortcut: "Cmd+K")
+                    ShortcutRow(name: "交换语言", shortcut: "Cmd+E")
+                    ShortcutRow(name: "历史记录", shortcut: "Cmd+H")
+                    ShortcutRow(name: "设置", shortcut: "Cmd+,")
+                }
+            }
+
+            Section("提示") {
+                Text("⚠️ 自定义全局快捷键功能将在未来版本中提供")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+/// 快捷键行显示
+struct ShortcutRow: View {
+    let name: String
+    let shortcut: String
+
+    var body: some View {
+        HStack {
+            Text(name)
+            Spacer()
+            Text(shortcut)
+                .font(.system(.body, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+/// 键盘快捷键选择器（简化版，完整功能待实现）
+struct KeyboardShortcutView: View {
+    @Binding var modifiers: [String]
+    @Binding var key: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(modifiers, id: \.self) { modifier in
+                Text(modifier)
+                    .font(.system(.body, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.2))
+                    .cornerRadius(4)
+            }
+
+            Text(key)
+                .font(.system(.body, design: .monospaced))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.blue.opacity(0.2))
+                .cornerRadius(4)
+        }
+    }
+}
+
+// MARK: - Tab 4: 高级设置
+
+struct AdvancedSettingsView: View {
+    @StateObject private var settings = SettingsManager.shared
+    @State private var showResetAlert = false
+
+    var body: some View {
+        Form {
+            Section("Backend 配置") {
+                HStack {
+                    Text("Backend URL")
+                    Spacer()
+                    TextField("http://localhost:8000", text: $settings.backendURL)
+                        .frame(width: 250)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .help("MacCortex Backend 服务地址")
+
+                HStack {
+                    Text("连接超时")
+                    Spacer()
+                    TextField("", value: $settings.backendTimeout, format: .number)
+                        .frame(width: 60)
+                        .textFieldStyle(.roundedBorder)
+                    Text("秒")
+                }
+            }
+
+            Section("缓存设置") {
+                HStack {
+                    Text("缓存大小")
+                    Spacer()
+                    TextField("", value: $settings.cacheSize, format: .number)
+                        .frame(width: 80)
+                        .textFieldStyle(.roundedBorder)
+                    Text("条")
+                }
+                .help("翻译缓存最多保存的条目数")
+
+                HStack {
+                    Text("缓存过期时间")
+                    Spacer()
+                    TextField("", value: $settings.cacheTTL, format: .number)
+                        .frame(width: 60)
+                        .textFieldStyle(.roundedBorder)
+                    Text("小时")
+                }
+
+                Button("清除缓存") {
+                    clearCache()
+                }
+                .help("清除所有翻译缓存（需要重启 Backend）")
+            }
+
+            Section("调试选项") {
+                Toggle("启用调试日志", isOn: $settings.enableDebugLogging)
+                    .help("在控制台输出详细日志（用于问题排查）")
+
+                Toggle("显示 API 响应时间", isOn: $settings.showAPIResponseTime)
+                    .help("在界面上显示每次 API 调用的耗时")
+            }
+
+            Section("数据管理") {
+                Button("重置所有设置") {
+                    showResetAlert = true
+                }
+                .foregroundColor(.red)
+                .alert("确认重置", isPresented: $showResetAlert) {
+                    Button("取消", role: .cancel) {}
+                    Button("重置", role: .destructive) {
+                        resetAllSettings()
+                    }
+                } message: {
+                    Text("此操作将恢复所有默认设置，是否继续？")
+                }
+
+                Button("导出设置") {
+                    exportSettings()
+                }
+
+                Button("导入设置") {
+                    importSettings()
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func clearCache() {
+        // TODO: 调用 Backend API 清除缓存
+        print("[Settings] 清除缓存")
+    }
+
+    private func resetAllSettings() {
+        settings.reset()
+        print("[Settings] 重置所有设置")
+    }
+
+    private func exportSettings() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "MacCortex_Settings.json"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.export(to: url)
+        }
+    }
+
+    private func importSettings() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.import(from: url)
+        }
+    }
+}
+
+// MARK: - 设置管理器
+
+/// 设置管理器（单例）
+@MainActor
+class SettingsManager: ObservableObject {
+    static let shared = SettingsManager()
+
+    // MARK: - 通用设置
+
+    @Published var defaultSourceLanguage: Language {
+        didSet { save("defaultSourceLanguage", defaultSourceLanguage.rawValue) }
+    }
+
+    @Published var defaultTargetLanguage: Language {
+        didSet { save("defaultTargetLanguage", defaultTargetLanguage.rawValue) }
+    }
+
+    @Published var defaultStyle: TranslationStyle {
+        didSet { save("defaultStyle", defaultStyle.rawValue) }
+    }
+
+    @Published var defaultUseStreaming: Bool {
+        didSet { save("defaultUseStreaming", defaultUseStreaming) }
+    }
+
+    @Published var autoSaveHistory: Bool {
+        didSet { save("autoSaveHistory", autoSaveHistory) }
+    }
+
+    @Published var showMainWindowOnLaunch: Bool {
+        didSet { save("showMainWindowOnLaunch", showMainWindowOnLaunch) }
+    }
+
+    @Published var appTheme: AppTheme {
+        didSet { save("appTheme", appTheme.rawValue) }
+    }
+
+    // MARK: - 剪贴板设置
+
+    @Published var clipboardMonitorEnabled: Bool {
+        didSet { save("clipboardMonitorEnabled", clipboardMonitorEnabled) }
+    }
+
+    @Published var clipboardMinimumLength: Int {
+        didSet { save("clipboardMinimumLength", clipboardMinimumLength) }
+    }
+
+    @Published var clipboardPollingInterval: Double {
+        didSet { save("clipboardPollingInterval", clipboardPollingInterval) }
+    }
+
+    @Published var clipboardExcludeURLs: Bool {
+        didSet { save("clipboardExcludeURLs", clipboardExcludeURLs) }
+    }
+
+    @Published var clipboardExcludeNumbers: Bool {
+        didSet { save("clipboardExcludeNumbers", clipboardExcludeNumbers) }
+    }
+
+    @Published var clipboardExcludeCode: Bool {
+        didSet { save("clipboardExcludeCode", clipboardExcludeCode) }
+    }
+
+    @Published var clipboardMaxLength: Int {
+        didSet { save("clipboardMaxLength", clipboardMaxLength) }
+    }
+
+    @Published var clipboardAutoCopyResult: Bool {
+        didSet { save("clipboardAutoCopyResult", clipboardAutoCopyResult) }
+    }
+
+    @Published var clipboardShowNotification: Bool {
+        didSet { save("clipboardShowNotification", clipboardShowNotification) }
+    }
+
+    // MARK: - 快捷键设置
+
+    @Published var globalHotKeyEnabled: Bool {
+        didSet { save("globalHotKeyEnabled", globalHotKeyEnabled) }
+    }
+
+    @Published var floatingPanelModifiers: [String] {
+        didSet { save("floatingPanelModifiers", floatingPanelModifiers) }
+    }
+
+    @Published var floatingPanelKey: String {
+        didSet { save("floatingPanelKey", floatingPanelKey) }
+    }
+
+    // MARK: - 高级设置
+
+    @Published var backendURL: String {
+        didSet { save("backendURL", backendURL) }
+    }
+
+    @Published var backendTimeout: Int {
+        didSet { save("backendTimeout", backendTimeout) }
+    }
+
+    @Published var cacheSize: Int {
+        didSet { save("cacheSize", cacheSize) }
+    }
+
+    @Published var cacheTTL: Int {
+        didSet { save("cacheTTL", cacheTTL) }
+    }
+
+    @Published var enableDebugLogging: Bool {
+        didSet { save("enableDebugLogging", enableDebugLogging) }
+    }
+
+    @Published var showAPIResponseTime: Bool {
+        didSet { save("showAPIResponseTime", showAPIResponseTime) }
+    }
+
+    // MARK: - 初始化
+
+    private init() {
+        // 通用设置
+        self.defaultSourceLanguage = Language(rawValue: UserDefaults.standard.string(forKey: "defaultSourceLanguage") ?? "auto") ?? .auto
+        self.defaultTargetLanguage = Language(rawValue: UserDefaults.standard.string(forKey: "defaultTargetLanguage") ?? "en-US") ?? .english
+        self.defaultStyle = TranslationStyle(rawValue: UserDefaults.standard.string(forKey: "defaultStyle") ?? "formal") ?? .formal
+        self.defaultUseStreaming = UserDefaults.standard.bool(forKey: "defaultUseStreaming")
+        self.autoSaveHistory = UserDefaults.standard.object(forKey: "autoSaveHistory") as? Bool ?? true
+        self.showMainWindowOnLaunch = UserDefaults.standard.object(forKey: "showMainWindowOnLaunch") as? Bool ?? true
+        self.appTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? "system") ?? .system
+
+        // 剪贴板设置
+        self.clipboardMonitorEnabled = UserDefaults.standard.bool(forKey: "clipboardMonitorEnabled")
+        self.clipboardMinimumLength = UserDefaults.standard.object(forKey: "clipboardMinimumLength") as? Int ?? 3
+        self.clipboardPollingInterval = UserDefaults.standard.object(forKey: "clipboardPollingInterval") as? Double ?? 0.5
+        self.clipboardExcludeURLs = UserDefaults.standard.object(forKey: "clipboardExcludeURLs") as? Bool ?? true
+        self.clipboardExcludeNumbers = UserDefaults.standard.object(forKey: "clipboardExcludeNumbers") as? Bool ?? true
+        self.clipboardExcludeCode = UserDefaults.standard.object(forKey: "clipboardExcludeCode") as? Bool ?? false
+        self.clipboardMaxLength = UserDefaults.standard.object(forKey: "clipboardMaxLength") as? Int ?? 5000
+        self.clipboardAutoCopyResult = UserDefaults.standard.bool(forKey: "clipboardAutoCopyResult")
+        self.clipboardShowNotification = UserDefaults.standard.bool(forKey: "clipboardShowNotification")
+
+        // 快捷键设置
+        self.globalHotKeyEnabled = UserDefaults.standard.object(forKey: "globalHotKeyEnabled") as? Bool ?? true
+        self.floatingPanelModifiers = UserDefaults.standard.array(forKey: "floatingPanelModifiers") as? [String] ?? ["Cmd", "Shift"]
+        self.floatingPanelKey = UserDefaults.standard.string(forKey: "floatingPanelKey") ?? "T"
+
+        // 高级设置
+        self.backendURL = UserDefaults.standard.string(forKey: "backendURL") ?? "http://localhost:8000"
+        self.backendTimeout = UserDefaults.standard.object(forKey: "backendTimeout") as? Int ?? 30
+        self.cacheSize = UserDefaults.standard.object(forKey: "cacheSize") as? Int ?? 1000
+        self.cacheTTL = UserDefaults.standard.object(forKey: "cacheTTL") as? Int ?? 1
+        self.enableDebugLogging = UserDefaults.standard.bool(forKey: "enableDebugLogging")
+        self.showAPIResponseTime = UserDefaults.standard.bool(forKey: "showAPIResponseTime")
+    }
+
+    // MARK: - 持久化
+
+    private func save<T>(_ key: String, _ value: T) {
+        UserDefaults.standard.set(value, forKey: key)
+    }
+
+    /// 重置所有设置
+    func reset() {
+        // 清除所有 UserDefaults
+        let domain = Bundle.main.bundleIdentifier!
+        UserDefaults.standard.removePersistentDomain(forName: domain)
+        UserDefaults.standard.synchronize()
+
+        // 重新加载默认值（重新初始化）
+        // 注意：这里需要手动重置所有属性，避免触发 didSet
+    }
+
+    /// 导出设置到 JSON
+    func export(to url: URL) {
+        // TODO: 实现设置导出
+        print("[Settings] 导出设置到: \(url)")
+    }
+
+    /// 从 JSON 导入设置
+    func `import`(from url: URL) {
+        // TODO: 实现设置导入
+        print("[Settings] 从导入设置: \(url)")
+    }
+}
+
+// MARK: - 数据模型
+
+/// 应用主题
+enum AppTheme: String, CaseIterable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    var displayName: String {
+        switch self {
+        case .system: return "系统默认"
+        case .light: return "浅色"
+        case .dark: return "深色"
+        }
+    }
+}
+
+// MARK: - 预览
+
+#Preview {
+    SettingsView()
+}
