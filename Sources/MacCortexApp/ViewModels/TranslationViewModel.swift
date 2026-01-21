@@ -50,6 +50,14 @@ class TranslationViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        // Phase 3 Week 3 后续: 从 SettingsManager 加载默认值
+        let settings = SettingsManager.shared
+        self.sourceLanguage = settings.defaultSourceLanguage
+        self.targetLanguage = settings.defaultTargetLanguage
+        self.style = settings.defaultStyle
+        self.useStreamingMode = settings.defaultUseStreaming
+        self.clipboardMonitorEnabled = settings.clipboardMonitorEnabled
+
         // 监听输入变化（实时翻译）
         $inputText
             .debounce(for: .milliseconds(800), scheduler: RunLoop.main)
@@ -61,6 +69,13 @@ class TranslationViewModel: ObservableObject {
                         await self.translate()
                     }
                 }
+            }
+            .store(in: &cancellables)
+
+        // 监听设置变化
+        settings.$clipboardMonitorEnabled
+            .sink { [weak self] isEnabled in
+                self?.clipboardMonitorEnabled = isEnabled
             }
             .store(in: &cancellables)
 

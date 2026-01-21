@@ -56,6 +56,10 @@ class ClipboardMonitor: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        // Phase 3 Week 3 后续: 从 SettingsManager 加载配置
+        let settings = SettingsManager.shared
+        self.minimumLength = settings.clipboardMinimumLength
+
         // 初始化时不自动启动，需要用户明确启用
         lastChangeCount = NSPasteboard.general.changeCount
     }
@@ -70,14 +74,17 @@ class ClipboardMonitor: ObservableObject {
         lastChangeCount = NSPasteboard.general.changeCount
         lastProcessedText = NSPasteboard.general.string(forType: .string) ?? ""
 
-        // 创建定时器（0.5 秒轮询一次）
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        // Phase 3 Week 3 后续: 从 SettingsManager 读取轮询间隔
+        let pollingInterval = SettingsManager.shared.clipboardPollingInterval
+
+        // 创建定时器（使用设置的轮询间隔）
+        timer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkClipboard()
             }
         }
 
-        print("[ClipboardMonitor] 开始监听剪贴板")
+        print("[ClipboardMonitor] 开始监听剪贴板（轮询间隔: \(pollingInterval)s）")
     }
 
     /// 停止监听剪贴板
@@ -123,9 +130,12 @@ class ClipboardMonitor: ObservableObject {
 
     /// 判断是否应该处理该文本
     private func shouldProcessText(_ text: String) -> Bool {
+        // Phase 3 Week 3 后续: 使用 SettingsManager 配置
+        let settings = SettingsManager.shared
+
         // 1. 长度检查
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedText.count >= minimumLength else {
+        guard trimmedText.count >= settings.clipboardMinimumLength else {
             return false
         }
 
@@ -134,18 +144,31 @@ class ClipboardMonitor: ObservableObject {
             return false
         }
 
-        // 3. 排除 URL（避免误触发）
-        if trimmedText.hasPrefix("http://") || trimmedText.hasPrefix("https://") {
-            return false
+        // 3. 排除 URL（如果启用）
+        if settings.clipboardExcludeURLs {
+            if trimmedText.hasPrefix("http://") || trimmedText.hasPrefix("https://") {
+                return false
+            }
         }
 
-        // 4. 排除纯数字
-        if trimmedText.allSatisfy({ $0.isNumber }) {
-            return false
+        // 4. 排除纯数字（如果启用）
+        if settings.clipboardExcludeNumbers {
+            if trimmedText.allSatisfy({ $0.isNumber }) {
+                return false
+            }
         }
 
-        // 5. 排除过长文本（> 5000 字符）
-        if trimmedText.count > 5000 {
+        // 5. 排除代码片段（如果启用）
+        if settings.clipboardExcludeCode {
+            // 简单判断：如果包含大量符号（如 { } ; ( ) [ ]），认为是代码
+            let symbolCount = trimmedText.filter { "{}();[]<>=+-*/&|!@#$%^".contains($0) }.count
+            if Double(symbolCount) / Double(trimmedText.count) > 0.2 {
+                return false
+            }
+        }
+
+        // 6. 最大长度限制
+        if trimmedText.count > settings.clipboardMaxLength {
             return false
         }
 
