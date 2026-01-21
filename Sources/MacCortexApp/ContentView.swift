@@ -37,6 +37,7 @@ struct MainView: View {
     @Environment(AppState.self) private var appState
     @State private var showSettings = false
     @State private var showUndoHistory = false  // Phase 2 Week 2 Day 10: 撤销历史
+    @State private var showMCPServerList = false  // Phase 2 Week 3 Day 11-12: MCP 服务器列表
 
     var body: some View {
         NavigationView {
@@ -319,6 +320,14 @@ struct MainView: View {
                         Label("撤销历史", systemImage: "arrow.uturn.backward.circle")
                     }
                 }
+
+                ToolbarItem(placement: .automatic) {
+                    Button(action: {
+                        showMCPServerList = true
+                    }) {
+                        Label("MCP 服务器", systemImage: "server.rack")
+                    }
+                }
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -328,6 +337,10 @@ struct MainView: View {
         .sheet(isPresented: $showUndoHistory) {
             // Phase 2 Week 2 Day 10: 撤销历史视图
             UndoHistoryView()
+        }
+        .sheet(isPresented: $showMCPServerList) {
+            // Phase 2 Week 3 Day 11-12: MCP 服务器列表
+            MCPServerListView()
         }
         .sheet(isPresented: Binding(
             get: { appState.showRiskConfirmation },

@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "description": "MCP 服务器白名单（仅信任的服务器可加载）",
+  "allowedServers": [
+    "file:///usr/local/bin/mcp-server-filesystem",
+    "file:///usr/local/bin/mcp-server-sqlite",
+    "file:///usr/local/bin/mcp-server-brave-search",
+    "file:///usr/local/bin/mcp-server-memory",
+    "file:///usr/local/bin/mcp-server-github",
+    "file:///usr/local/bin/mcp-server-slack",
+    "file:///usr/local/bin/mcp-server-google-drive"
+  ],
+  "notes": [
+    "白名单配置说明：",
+    "1. 仅允许 file:// 协议的本地可执行文件",
+    "2. 所有 MCP 服务器必须通过 npm/homebrew 等可信来源安装",
+    "3. 服务器路径必须在标准系统目录（/usr/local/bin）",
+    "4. 添加新服务器前需验证来源与签名",
+    "5. 定期审查已加载服务器的权限与行为"
+  ],
+  "trustedSources": {
+    "official": "https://github.com/modelcontextprotocol/servers",
+    "community": "https://github.com/punkpeye/awesome-mcp-servers"
+  }
+}

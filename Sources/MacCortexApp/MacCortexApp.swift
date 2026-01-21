@@ -73,6 +73,11 @@ class AppState {
     var currentRiskAssessment: RiskAssessment? = nil
     var riskConfirmationResult: Bool? = nil
 
+    // MARK: - Phase 2 Week 3 Day 11-12: MCP 服务器管理
+    var showMCPServerList: Bool = false
+    var mcpServers: [MCPServer] = []
+    var isLoadingMCPServers: Bool = false
+
     init() {
         checkPermissions()
     }
@@ -301,6 +306,31 @@ class AppState {
             pendingOperations.remove(at: index)
         }
     }
+
+    // MARK: - Phase 2 Week 3 Day 11-12: MCP 服务器管理
+
+    /// 加载 MCP 服务器列表
+    @MainActor
+    func loadMCPServers() async {
+        isLoadingMCPServers = true
+        let servers = await MCPManager.shared.getAllServers()
+        mcpServers = servers
+        isLoadingMCPServers = false
+    }
+
+    /// 加载单个 MCP 服务器
+    @MainActor
+    func loadMCPServer(url: URL) async throws {
+        let _ = try await MCPManager.shared.loadServer(url: url)
+        await loadMCPServers()
+    }
+
+    /// 卸载 MCP 服务器
+    @MainActor
+    func unloadMCPServer(id: UUID) async {
+        await MCPManager.shared.unloadServer(id: id)
+        await loadMCPServers()
+    }
 }
 
 // MARK: - 数据模型（Phase 2）
@@ -337,7 +367,7 @@ enum DetectedScene: String, CaseIterable {
 }
 
 /// 信任等级（渐进式信任机制）
-enum TrustLevel: Int, CaseIterable {
+enum TrustLevel: Int, CaseIterable, Codable {
     case R0 = 0 // 只读（Read-only）
     case R1 = 1 // 低风险写入（文本编辑）
     case R2 = 2 // 中风险操作（文件移动）
