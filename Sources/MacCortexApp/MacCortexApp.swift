@@ -34,6 +34,13 @@ struct MacCortexApp: App {
                 MacCortexAppShortcuts.updateAppShortcutParameters()
             }
         }
+
+        // Phase 3 Week 3 Day 5: 注册全局快捷键
+        Task { @MainActor in
+            // 延迟 1 秒，等待应用完全启动后再注册
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            GlobalHotKeyManager.shared.registerHotKeys()
+        }
     }
 
     var body: some Scene {
