@@ -28,6 +28,9 @@ class Subtask(TypedDict):
     description: str                    # 任务描述
     dependencies: List[str]             # 依赖的子任务 ID 列表
     acceptance_criteria: List[str]      # 验收标准列表
+    # 工具任务专用字段
+    tool_name: Optional[str]            # 工具名称（如 "write_file"）
+    tool_args: Optional[Dict[str, Any]] # 工具参数
 
 
 class Plan(TypedDict):

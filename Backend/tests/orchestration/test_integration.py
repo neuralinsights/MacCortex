@@ -21,6 +21,22 @@ from src.orchestration.swarm_graph import create_full_swarm_graph, run_full_swar
 from src.orchestration.state import create_initial_state
 
 
+def create_default_reflector_response():
+    """创建默认的成功 reflector 响应"""
+    response = Mock()
+    response.content = """```json
+{
+  "passed": true,
+  "summary": "所有子任务成功完成。",
+  "feedback": "",
+  "achievements": ["任务完成"],
+  "issues": [],
+  "recommendation": "completed"
+}
+```"""
+    return response
+
+
 def create_mock_graph(tmp_path, mock_llm=None, mock_search=None, **custom_kwargs):
     """
     创建带有默认 mock LLM 的测试图
@@ -47,7 +63,8 @@ def create_mock_graph(tmp_path, mock_llm=None, mock_search=None, **custom_kwargs
         "reviewer": {"llm": mock_llm},
         "researcher": {"llm": mock_llm, "search": mock_search},
         "tool_runner": {},  # ToolRunner 不需要 LLM
-        "stop_condition": {}
+        "stop_condition": {},
+        "reflector": {"llm": mock_llm}  # Reflector 需要 LLM
     }
 
     # 合并自定义参数
@@ -113,7 +130,8 @@ print(fibonacci(5))
         mock_llm.ainvoke = AsyncMock(side_effect=[
             planner_response,  # Planner 调用
             coder_response,    # Coder 调用
-            reviewer_response  # Reviewer 调用
+            reviewer_response,  # Reviewer 调用
+            create_default_reflector_response()  # Reflector 调用
         ])
 
         # 创建图（注入 mock LLM，自动为未使用的 agent 提供默认 mock）
@@ -190,7 +208,8 @@ def good_function():
             coder_response_1,
             reviewer_response_1,
             coder_response_2,   # 重试
-            reviewer_response_2  # 重试审查
+            reviewer_response_2,  # 重试审查
+            create_default_reflector_response()  # Reflector 调用
         ])
 
         # 创建图（使用辅助函数自动为未使用的 agent 提供 mock）
@@ -248,7 +267,8 @@ class TestResearchTaskIntegration:
         # 配置 mock
         mock_llm.ainvoke = AsyncMock(side_effect=[
             planner_response,
-            researcher_response
+            researcher_response,
+            create_default_reflector_response()  # Reflector 调用
         ])
         mock_search.run = Mock(return_value="Python asyncio 搜索结果...")
 
@@ -297,7 +317,10 @@ class TestToolTaskIntegration:
 ```""" % tmp_path
 
         # 配置 mock
-        mock_llm.ainvoke = AsyncMock(return_value=planner_response)
+        mock_llm.ainvoke = AsyncMock(side_effect=[
+            planner_response,
+            create_default_reflector_response()  # Reflector 调用
+        ])
 
         # 创建图（使用辅助函数自动为未使用的 agent 提供 mock）
         graph, _, _ = create_mock_graph(tmp_path, mock_llm=mock_llm)
@@ -351,7 +374,10 @@ class TestToolTaskIntegration:
 ```""" % (tmp_path, tmp_path)
 
         # 配置 mock
-        mock_llm.ainvoke = AsyncMock(return_value=planner_response)
+        mock_llm.ainvoke = AsyncMock(side_effect=[
+            planner_response,
+            create_default_reflector_response()  # Reflector 调用
+        ])
 
         # 创建图（使用辅助函数自动为未使用的 agent 提供 mock）
         graph, _, _ = create_mock_graph(tmp_path, mock_llm=mock_llm)
@@ -436,7 +462,8 @@ def read_file(path):
             planner_response,
             researcher_response,
             coder_response,
-            reviewer_response
+            reviewer_response,
+            create_default_reflector_response()  # Reflector 响应
         ])
         mock_search.run = Mock(return_value="Python 文件操作搜索结果...")
 
@@ -479,10 +506,12 @@ class TestErrorHandling:
 
         mock_llm.ainvoke = AsyncMock(return_value=planner_response)
 
-        # 创建图
-        graph = create_full_swarm_graph(
+        # 创建图（使用辅助函数自动为未使用的 agent 提供 mock）
+        # 对于空计划测试，需要设置 min_subtasks=0
+        graph, _, _ = create_mock_graph(
             tmp_path,
-            planner={"llm": mock_llm}
+            mock_llm=mock_llm,
+            planner={"llm": mock_llm, "min_subtasks": 0}
         )
 
         # 执行
@@ -583,7 +612,8 @@ class TestStopConditions:
             planner_response,
             researcher_response,
             researcher_response,
-            researcher_response
+            researcher_response,
+            create_default_reflector_response()  # Reflector 响应
         ])
 
         mock_search = Mock()
@@ -640,7 +670,8 @@ class TestRunFullSwarmTask:
 
         mock_llm.ainvoke = AsyncMock(side_effect=[
             planner_response,
-            researcher_response
+            researcher_response,
+            create_default_reflector_response()  # Reflector 响应
         ])
         mock_search.run = Mock(return_value="搜索结果")
 
@@ -648,14 +679,207 @@ class TestRunFullSwarmTask:
         result = await run_full_swarm_task(
             user_input="调研测试",
             workspace_path=tmp_path,
-            planner={"llm": mock_llm},
-            researcher={"llm": mock_llm, "search": mock_search}
+            planner={"llm": mock_llm, "min_subtasks": 1},
+            coder={"llm": mock_llm},
+            reviewer={"llm": mock_llm},
+            researcher={"llm": mock_llm, "search": mock_search},
+            tool_runner={},
+            stop_condition={},
+            reflector={"llm": mock_llm}  # Reflector 配置
         )
 
         # 验证结果
         assert result["status"] == "completed"
         assert len(result["subtask_results"]) == 1
         assert result["subtask_results"][0]["passed"] is True
+
+
+@pytest.mark.asyncio
+class TestReflectorIntegration:
+    """测试 Reflector Agent 整体反思功能"""
+
+    async def test_reflector_with_successful_tasks(self, tmp_path):
+        """测试所有子任务成功时的反思"""
+        mock_llm = AsyncMock()
+
+        # Planner 响应
+        planner_response = Mock()
+        planner_response.content = """```json
+{
+  "task": "简单任务",
+  "subtasks": [
+    {
+      "id": 1,
+      "type": "tool",
+      "description": "创建测试文件",
+      "tool_name": "write_file",
+      "tool_args": {
+        "path": "%s/test.txt",
+        "content": "测试内容"
+      },
+      "acceptance_criteria": ["文件创建成功"]
+    }
+  ],
+  "overall_acceptance": ["文件创建成功", "内容正确"]
+}
+```""" % tmp_path
+
+        # Reflector 响应（成功）
+        reflector_response = Mock()
+        reflector_response.content = """```json
+{
+  "passed": true,
+  "summary": "所有子任务都成功完成，文件创建成功并包含正确内容。",
+  "feedback": "",
+  "achievements": ["文件创建成功", "内容验证通过"],
+  "issues": [],
+  "recommendation": "completed"
+}
+```"""
+
+        mock_llm.ainvoke = AsyncMock(side_effect=[
+            planner_response,
+            reflector_response
+        ])
+
+        # 创建图
+        graph, _, _ = create_mock_graph(tmp_path, mock_llm=mock_llm)
+
+        # 执行
+        state = create_initial_state("创建测试文件")
+        final_state = await graph.ainvoke(state)
+
+        # 验证结果
+        assert final_state["status"] == "completed"
+        assert final_state["final_output"]["passed"] is True
+        assert "成功" in final_state["final_output"]["summary"]
+        assert len(final_state["final_output"]["achievements"]) > 0
+
+    async def test_reflector_with_failed_tasks(self, tmp_path):
+        """测试有子任务失败时的反思"""
+        mock_llm = AsyncMock()
+
+        # Planner 响应
+        planner_response = Mock()
+        planner_response.content = """```json
+{
+  "task": "失败任务",
+  "subtasks": [
+    {
+      "id": 1,
+      "type": "tool",
+      "description": "创建测试文件",
+      "tool_name": "write_file",
+      "tool_args": {
+        "path": "/invalid_path/test.txt",
+        "content": "测试"
+      },
+      "acceptance_criteria": ["文件创建成功"]
+    }
+  ],
+  "overall_acceptance": ["文件创建成功"]
+}
+```"""
+
+        # Reflector 响应（失败）
+        reflector_response = Mock()
+        reflector_response.content = """```json
+{
+  "passed": false,
+  "summary": "子任务执行失败，未能创建文件。路径无效导致操作失败。",
+  "feedback": "需要使用有效的文件路径。建议在 workspace 内创建文件。",
+  "achievements": [],
+  "issues": ["路径无效", "文件创建失败"],
+  "recommendation": "retry"
+}
+```"""
+
+        mock_llm.ainvoke = AsyncMock(side_effect=[
+            planner_response,
+            reflector_response
+        ])
+
+        # 创建图
+        graph, _, _ = create_mock_graph(tmp_path, mock_llm=mock_llm)
+
+        # 执行
+        state = create_initial_state("创建测试文件")
+        final_state = await graph.ainvoke(state)
+
+        # 验证结果
+        assert final_state["status"] == "failed"
+        assert final_state["final_output"]["passed"] is False
+        assert len(final_state["final_output"]["issues"]) > 0
+        assert "整体验收未通过" in final_state["error_message"]
+
+    async def test_reflector_with_mixed_results(self, tmp_path):
+        """测试混合结果（部分成功，部分失败）"""
+        mock_llm = AsyncMock()
+        mock_search = Mock()
+
+        # Planner 响应
+        planner_response = Mock()
+        planner_response.content = f"""```json
+{{
+  "task": "混合任务",
+  "subtasks": [
+    {{
+      "id": 1,
+      "type": "tool",
+      "description": "创建成功的文件",
+      "tool_name": "write_file",
+      "tool_args": {{
+        "path": "{tmp_path}/success.txt",
+        "content": "成功"
+      }},
+      "acceptance_criteria": ["文件创建"]
+    }},
+    {{
+      "id": 2,
+      "type": "research",
+      "description": "调研测试",
+      "acceptance_criteria": ["获取信息"]
+    }}
+  ],
+  "overall_acceptance": ["所有任务完成", "质量达标"]
+}}
+```"""
+
+        # Researcher 响应
+        researcher_response = Mock()
+        researcher_response.content = "调研结果：测试信息已获取"
+
+        # Reflector 响应
+        reflector_response = Mock()
+        reflector_response.content = """```json
+{
+  "passed": true,
+  "summary": "混合任务整体完成良好。文件创建成功，调研信息完整。",
+  "feedback": "",
+  "achievements": ["文件操作成功", "信息收集完整"],
+  "issues": [],
+  "recommendation": "completed"
+}
+```"""
+
+        mock_llm.ainvoke = AsyncMock(side_effect=[
+            planner_response,
+            researcher_response,
+            reflector_response
+        ])
+        mock_search.run = Mock(return_value="搜索结果")
+
+        # 创建图
+        graph, _, _ = create_mock_graph(tmp_path, mock_llm=mock_llm, mock_search=mock_search)
+
+        # 执行
+        state = create_initial_state("混合任务")
+        final_state = await graph.ainvoke(state)
+
+        # 验证结果
+        assert final_state["status"] == "completed"
+        assert len(final_state["subtask_results"]) == 2
+        assert final_state["final_output"]["passed"] is True
 
 
 if __name__ == "__main__":

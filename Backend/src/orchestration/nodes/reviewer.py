@@ -145,6 +145,7 @@ class ReviewerNode:
             # 强制标记为失败，进入下一个子任务或结束
             state["subtask_results"].append({
                 "subtask_id": subtask["id"],
+                "subtask_description": subtask["description"],
                 "code": state["current_code"],
                 "output": "",
                 "passed": False,
@@ -172,6 +173,7 @@ class ReviewerNode:
             # ✅ 审查通过 - 保存结果，进入下一个子任务
             state["subtask_results"].append({
                 "subtask_id": subtask["id"],
+                "subtask_description": subtask["description"],
                 "code": state["current_code"],
                 "output": output,
                 "passed": True

@@ -8,6 +8,7 @@ MacCortex Swarm Graph - 完整实现
 - Researcher: 调研与搜索
 - ToolRunner: 系统工具执行
 - StopCondition: 循环终止检查
+- Reflector: 整体反思
 """
 
 from langgraph.graph import StateGraph, END
@@ -22,6 +23,7 @@ from .nodes.reviewer import create_reviewer_node
 from .nodes.researcher import create_researcher_node
 from .nodes.tool_runner import create_tool_runner_node
 from .nodes.stop_condition import create_stop_condition_node
+from .nodes.reflector import create_reflector_node
 
 
 def create_full_swarm_graph(
@@ -39,7 +41,9 @@ def create_full_swarm_graph(
        - research → Researcher
        - tool → ToolRunner
     3. StopCondition 检查是否终止
-    4. 返回 Planner 继续下一个子任务
+    4. 如果还有子任务，继续执行下一个子任务
+    5. 所有子任务完成后 → Reflector 整体反思
+    6. Reflector 评估整体质量并终止
 
     Args:
         workspace_path: 工作空间路径
@@ -59,6 +63,7 @@ def create_full_swarm_graph(
     researcher_node = create_researcher_node(workspace_path, **agent_kwargs.get("researcher", {}))
     tool_runner_node = create_tool_runner_node(workspace_path, **agent_kwargs.get("tool_runner", {}))
     stop_condition_node = create_stop_condition_node(**agent_kwargs.get("stop_condition", {}))
+    reflector_node = create_reflector_node(workspace_path, **agent_kwargs.get("reflector", {}))
 
     # 添加节点到图
     graph.add_node("planner", planner_node)
@@ -67,6 +72,7 @@ def create_full_swarm_graph(
     graph.add_node("researcher", researcher_node)
     graph.add_node("tool_runner", tool_runner_node)
     graph.add_node("stop_condition", stop_condition_node)
+    graph.add_node("reflector", reflector_node)
 
     # 设置入口点
     graph.set_entry_point("planner")
@@ -118,33 +124,20 @@ def create_full_swarm_graph(
         """
         Reviewer 后的路由逻辑
 
-        如果审查通过 → stop_condition
-        如果审查失败且未达最大迭代 → coder（重新生成）
-        如果达到最大迭代 → stop_condition
+        根据 Reviewer 设置的状态决定路由：
+        - status="executing" → coder（重新生成）
+        - status="planning" 或 "completed" → stop_condition
+
+        注意：Reviewer 节点内部已经处理了状态更新，包括 iteration_count 和 review_feedback
         """
-        # 获取最后一个结果
-        subtask_results = state.get("subtask_results", [])
-        if not subtask_results:
-            return "stop_condition"
+        status = state.get("status", "")
 
-        last_result = subtask_results[-1]
-
-        # 如果通过，继续下一步
-        if last_result.get("passed", False):
-            return "stop_condition"
-
-        # 如果失败，检查迭代次数
-        iteration_count = state.get("iteration_count", 0)
-        max_iterations = 3  # TODO: 从配置读取
-
-        if iteration_count < max_iterations:
-            # 未达最大迭代，返回 Coder 重新生成
-            state["iteration_count"] = iteration_count + 1
-            state["review_feedback"] = last_result.get("feedback", "")
+        # 如果状态是 executing，说明审查失败需要重试
+        if status == "executing":
             return "coder"
-        else:
-            # 达到最大迭代，终止
-            return "stop_condition"
+
+        # 其他状态（planning/completed）都进入 stop_condition
+        return "stop_condition"
 
     def route_after_researcher(state: SwarmState) -> str:
         """Researcher 后路由到 stop_condition"""
@@ -158,15 +151,47 @@ def create_full_swarm_graph(
         """
         StopCondition 后的路由逻辑
 
-        如果状态为 completed 或 failed → END
-        否则 → planner（继续下一个子任务）
+        如果状态为 failed → END（异常终止）
+        如果所有子任务完成 → reflector（整体反思）
+        否则 → 直接路由到下一个子任务（不返回 Planner）
         """
         status = state.get("status", "")
 
-        if status in ["completed", "failed"]:
+        # 如果失败，直接终止
+        if status == "failed":
             return END
+
+        # 检查是否所有子任务都完成
+        plan = state.get("plan") or {}
+        subtasks = plan.get("subtasks", []) if plan else []
+        current_index = state.get("current_subtask_index", 0)
+
+        # 如果所有子任务都完成，进入 reflector
+        if not subtasks or current_index >= len(subtasks):
+            return "reflector"
+
+        # 否则，根据当前子任务类型路由到对应 Agent
+        subtask = subtasks[current_index]
+        task_type = subtask.get("type", "")
+
+        # 根据任务类型路由
+        if task_type == "code":
+            return "coder"
+        elif task_type == "research":
+            return "researcher"
+        elif task_type == "tool":
+            return "tool_runner"
         else:
-            return "planner"
+            # 未知类型，跳到 reflector
+            return "reflector"
+
+    def route_after_reflector(state: SwarmState) -> str:
+        """
+        Reflector 后的路由逻辑
+
+        Reflector 是最后一步，总是终止
+        """
+        return END
 
     # 添加条件边
     graph.add_conditional_edges(
@@ -208,9 +233,18 @@ def create_full_swarm_graph(
         "stop_condition",
         route_after_stop_condition,
         {
-            "planner": "planner",
+            "coder": "coder",
+            "researcher": "researcher",
+            "tool_runner": "tool_runner",
+            "reflector": "reflector",
             END: END
         }
+    )
+
+    graph.add_conditional_edges(
+        "reflector",
+        route_after_reflector,
+        {END: END}
     )
 
     # 编译图

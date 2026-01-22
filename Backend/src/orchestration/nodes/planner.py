@@ -224,7 +224,12 @@ class PlannerNode:
             # 更新状态
             state["plan"] = plan
             state["current_subtask_index"] = 0
-            state["status"] = "executing"
+
+            # 对于空计划，直接设置为 completed
+            if not plan["subtasks"]:
+                state["status"] = "completed"
+            else:
+                state["status"] = "executing"
 
             print(f"[Planner] 任务拆解完成，共 {len(plan['subtasks'])} 个子任务")
             for subtask in plan["subtasks"]:
@@ -319,7 +324,10 @@ class PlannerNode:
                 "type": subtask_data["type"],
                 "description": subtask_data["description"],
                 "dependencies": subtask_data.get("dependencies", []),
-                "acceptance_criteria": subtask_data["acceptance_criteria"]
+                "acceptance_criteria": subtask_data["acceptance_criteria"],
+                # 工具任务专用字段
+                "tool_name": subtask_data.get("tool_name"),
+                "tool_args": subtask_data.get("tool_args")
             }
 
             plan["subtasks"].append(subtask)
