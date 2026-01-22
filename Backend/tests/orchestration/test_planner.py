@@ -196,6 +196,78 @@ class TestPlannerParsing:
             planner._parse_plan(content)
 
 
+class TestPlannerComplexityEvaluation:
+    """测试任务复杂度评估功能"""
+
+    @pytest.fixture
+    def mock_api_key(self, monkeypatch):
+        """Mock ANTHROPIC_API_KEY 环境变量"""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key-12345")
+
+    @pytest.fixture
+    def planner(self, mock_api_key):
+        """创建 Planner 实例"""
+        return PlannerNode(min_subtasks=3, max_subtasks=10)
+
+    def test_evaluate_simple_task_hello_world(self, planner):
+        """测试简单任务：Hello World"""
+        task = "创建一个 Python 函数，打印 'Hello, World!'"
+        complexity = planner._evaluate_task_complexity(task)
+        assert complexity == "simple"
+
+    def test_evaluate_simple_task_short_description(self, planner):
+        """测试简单任务：短描述"""
+        task = "写一个加法函数"
+        complexity = planner._evaluate_task_complexity(task)
+        assert complexity == "simple"
+
+    def test_evaluate_simple_task_with_keywords(self, planner):
+        """测试简单任务：包含简单关键词"""
+        task = "编写一个简单的计算器函数，支持加法运算"
+        complexity = planner._evaluate_task_complexity(task)
+        assert complexity == "simple"
+
+    def test_evaluate_medium_task(self, planner):
+        """测试中等任务"""
+        task = "开发一个命令行待办事项工具，支持添加、删除、列表查看功能，数据保存到 JSON 文件"
+        complexity = planner._evaluate_task_complexity(task)
+        assert complexity == "medium"
+
+    def test_evaluate_complex_task(self, planner):
+        """测试复杂任务：包含复杂关键词"""
+        task = "设计一个完整的分布式系统架构，集成多个微服务组件，优化性能并确保高可用性"
+        complexity = planner._evaluate_task_complexity(task)
+        assert complexity == "complex"
+
+    def test_evaluate_complex_task_long_description(self, planner):
+        """测试复杂任务：长描述"""
+        task = "构建一个全面的 Web 应用平台，包含用户认证、数据库管理、API 接口、前端界面、后台管理系统、日志监控、性能优化、安全防护、自动化测试、CI/CD 流水线等完整功能模块，需要考虑可扩展性和维护性"
+        complexity = planner._evaluate_task_complexity(task)
+        assert complexity == "complex"
+
+    def test_validate_plan_with_dynamic_minimum(self, planner):
+        """测试使用动态最小值验证计划"""
+        plan: Plan = {
+            "subtasks": [
+                {
+                    "id": "task-1",
+                    "type": "code",
+                    "description": "打印 Hello World",
+                    "dependencies": [],
+                    "acceptance_criteria": ["输出正确"]
+                }
+            ],
+            "overall_acceptance": ["完成"]
+        }
+
+        # Simple task: 允许 1 个子任务
+        planner._validate_plan(plan, min_subtasks=1)
+
+        # Default: 要求 ≥3 个子任务
+        with pytest.raises(ValueError, match="子任务数量过少"):
+            planner._validate_plan(plan, min_subtasks=3)
+
+
 class TestPlannerValidation:
     """测试计划验证功能"""
 

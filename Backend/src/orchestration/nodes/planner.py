@@ -209,8 +209,19 @@ class PlannerNode:
         try:
             plan = self._parse_plan(response.content)
 
-            # 验证计划
-            self._validate_plan(plan)
+            # 评估任务复杂度，确定动态最小子任务数
+            task_complexity = self._evaluate_task_complexity(user_task)
+            if task_complexity == "simple" and self.min_subtasks > 1:
+                # 简单任务：降低最小要求到 1（仅当配置要求 >1 时）
+                min_required_subtasks = 1
+            else:
+                # 其他情况：使用配置的最小值
+                min_required_subtasks = self.min_subtasks
+
+            print(f"[Planner] 任务复杂度: {task_complexity}，最小子任务要求: {min_required_subtasks}")
+
+            # 验证计划（使用动态最小值）
+            self._validate_plan(plan, min_subtasks=min_required_subtasks)
 
             # 更新状态
             state["plan"] = plan
@@ -235,6 +246,57 @@ class PlannerNode:
             state["error_message"] = f"任务拆解失败: {str(e)}"
             print(f"[Planner] 错误: {state['error_message']}")
             return state
+
+    def _evaluate_task_complexity(self, user_task: str) -> str:
+        """
+        评估任务复杂度
+
+        Args:
+            user_task: 用户任务描述
+
+        Returns:
+            str: 复杂度级别（"simple" | "medium" | "complex"）
+        """
+        task_lower = user_task.lower()
+        task_len = len(user_task)
+
+        # Simple task indicators (简单任务关键词)
+        simple_keywords = [
+            "hello world", "打印", "输出", "print",
+            "创建一个函数", "写一个函数", "单个函数",
+            "简单", "basic", "simple"
+        ]
+
+        # Complex task indicators (复杂任务关键词)
+        complex_keywords = [
+            "系统", "平台", "框架", "架构",
+            "集成", "优化", "重构",
+            "多个", "完整", "全面",
+            "分布式", "微服务", "数据库"
+        ]
+
+        # Rule 1: 优先检查复杂关键词（无论长度）
+        if any(kw in task_lower for kw in complex_keywords):
+            return "complex"
+
+        # Rule 2: 长描述 → complex
+        if task_len > 200:
+            return "complex"
+
+        # Rule 3: 简单关键词 + 极短描述 → simple
+        if task_len < 40 and any(kw in task_lower for kw in simple_keywords):
+            return "simple"
+
+        # Rule 4: 极短描述（无复杂关键词）→ simple
+        if task_len < 40:
+            return "simple"
+
+        # Rule 5: 中等长度 (40-200) → medium
+        if 40 <= task_len <= 200:
+            return "medium"
+
+        # Default: medium
+        return "medium"
 
     def _build_user_prompt(self, user_task: str, context: Dict[str, Any]) -> str:
         """
@@ -325,21 +387,25 @@ class PlannerNode:
 
         return plan
 
-    def _validate_plan(self, plan: Plan):
+    def _validate_plan(self, plan: Plan, min_subtasks: Optional[int] = None):
         """
         验证计划的合理性
 
         Args:
             plan: 待验证的计划
+            min_subtasks: 最小子任务数（None 则使用 self.min_subtasks）
 
         Raises:
             ValueError: 如果计划不合理
         """
         subtasks = plan["subtasks"]
 
+        # Use provided min_subtasks or default
+        effective_min = min_subtasks if min_subtasks is not None else self.min_subtasks
+
         # 1. 检查子任务数量
-        if len(subtasks) < self.min_subtasks:
-            raise ValueError(f"子任务数量过少（{len(subtasks)}），至少需要 {self.min_subtasks} 个")
+        if len(subtasks) < effective_min:
+            raise ValueError(f"子任务数量过少（{len(subtasks)}），至少需要 {effective_min} 个")
 
         if len(subtasks) > self.max_subtasks:
             raise ValueError(f"子任务数量过多（{len(subtasks)}），最多 {self.max_subtasks} 个")
