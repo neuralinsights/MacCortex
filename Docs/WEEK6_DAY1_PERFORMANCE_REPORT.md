@@ -119,5 +119,81 @@
 
 ---
 
-**报告生成时间**: 2026-01-22 20:35:00 +1300
+---
+
+## 📅 Week 6 Day 2 更新 (2026-01-22)
+
+### 1. langchain-ollama 包升级 ✅
+
+**问题**: `langchain_community.chat_models.ChatOllama` 已废弃
+
+**解决方案**:
+```python
+# 旧版（已废弃）
+from langchain_community.chat_models import ChatOllama
+
+# 新版（推荐）
+from langchain_ollama import ChatOllama
+```
+
+**更新文件** (6 个):
+- `model_router.py`
+- `nodes/planner.py`
+- `nodes/coder.py`
+- `nodes/reviewer.py`
+- `nodes/reflector.py`
+- `nodes/researcher.py`
+
+**Commit**: 79d8419
+
+---
+
+### 2. 本地模型提示词简化 ✅
+
+| 节点 | 原始提示词 | 简化提示词 | 减少比例 |
+|------|-----------|-----------|----------|
+| Coder | ~1000 字符 | ~200 字符 | **80%** |
+| Reviewer | ~1200 字符 | ~300 字符 | **75%** |
+| Reflector | ~800 字符 | ~300 字符 | **63%** |
+
+**简化策略**:
+- 移除冗长示例
+- 保留核心指令
+- 强调 JSON 输出格式（Reviewer/Reflector）
+- 使用简洁中文表达
+
+**Commit**: 220c594
+
+---
+
+### 3. 性能测试结果 ✅
+
+使用 Ollama qwen3:14b 测试简化提示词：
+
+| 测试场景 | 响应时间 | 输出长度 |
+|----------|----------|----------|
+| Coder 简化提示词 | **34.87s** | 168 字符 |
+| Reviewer 简化提示词 | **15.06s** | 34 字符 (JSON) |
+
+**关键发现**:
+- ✅ Reviewer JSON 响应非常高效（15s 完成审查）
+- ✅ 简化提示词输出更简洁直接
+- ✅ 适合 Coder ↔ Reviewer 自纠错循环的快速迭代
+- ✅ 所有 420 个测试通过
+
+---
+
+### 4. Week 6 总体进度
+
+| 任务 | 状态 | Commit |
+|------|------|--------|
+| 修复 stop_condition 状态显示 | ✅ | f9f012a |
+| 创建智能模型路由器 | ✅ | Week 5 |
+| 升级 langchain-ollama | ✅ | 79d8419 |
+| 简化本地模型提示词 | ✅ | 220c594 |
+| 性能基准测试 | ✅ | 本报告 |
+
+---
+
+**报告更新时间**: 2026-01-22 UTC
 **生成工具**: Claude Code (Opus 4.5)
