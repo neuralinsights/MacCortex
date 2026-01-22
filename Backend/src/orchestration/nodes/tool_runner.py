@@ -14,9 +14,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime
-
+from langgraph.types import interrupt
 
 from ..state import SwarmState
+from ..hitl import create_tool_approval_prompt
 
 
 class ToolRunnerNode:
@@ -58,6 +59,7 @@ class ToolRunnerNode:
         workspace_path: Path,
         timeout: int = 30,
         allow_dangerous_ops: bool = False,
+        require_approval: bool = False,  # 新增：是否需要人工审批
     ):
         """
         初始化 ToolRunner 节点
@@ -66,10 +68,12 @@ class ToolRunnerNode:
             workspace_path: 工作空间路径（安全边界）
             timeout: 命令执行超时（秒）
             allow_dangerous_ops: 是否允许危险操作（默认 False）
+            require_approval: 是否需要人工审批（HITL，默认 False）
         """
         self.workspace = Path(workspace_path).resolve()
         self.timeout = timeout
         self.allow_dangerous_ops = allow_dangerous_ops
+        self.require_approval = require_approval
 
         # 确保 workspace 存在
         self.workspace.mkdir(parents=True, exist_ok=True)
@@ -102,11 +106,55 @@ class ToolRunnerNode:
             state["status"] = "planning"  # 返回 Planner 路由
             return state
 
+        tool_name = subtask.get("tool_name", "")
+        tool_args = subtask.get("tool_args", {})
+
+        # 新增：HITL 审批流程（在 try 块之前）
+        if self.require_approval:
+            # 创建审批提示
+            approval_prompt = create_tool_approval_prompt(
+                tool_name=tool_name,
+                tool_args=tool_args,
+                subtask_description=subtask["description"]
+            )
+
+            # 中断并等待用户确认（此处会抛出 Interrupt 异常，暂停执行）
+            user_decision = interrupt(approval_prompt)
+
+            # 恢复后执行到这里，处理用户决策
+            if user_decision["action"] == "deny":
+                # 用户拒绝执行
+                state["subtask_results"].append({
+                    "subtask_id": subtask["id"],
+                    "subtask_description": subtask["description"],
+                    "passed": False,
+                    "error_message": "用户拒绝执行工具",
+                    "completed_at": datetime.utcnow().isoformat()
+                })
+                state["current_subtask_index"] += 1
+                if state["current_subtask_index"] >= len(subtasks):
+                    state["status"] = "completed"
+                else:
+                    state["status"] = "planning"
+                return state
+
+            elif user_decision["action"] == "abort":
+                # 用户终止整个工作流
+                state["status"] = "failed"
+                state["error_message"] = "用户终止工作流"
+                return state
+
+            elif user_decision["action"] == "modify":
+                # 用户修改参数
+                tool_args = user_decision.get("modified_data", {}).get("tool_args", tool_args)
+
+            # action == "approve": 继续执行
+
         try:
             # 1. 执行工具
             tool_result = await self._execute_tool(
-                tool_name=subtask.get("tool_name", ""),
-                tool_args=subtask.get("tool_args", {}),
+                tool_name=tool_name,
+                tool_args=tool_args,
             )
 
             # 2. 检查结果是否包含错误信息
