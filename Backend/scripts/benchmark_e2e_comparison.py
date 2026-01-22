@@ -32,9 +32,21 @@ async def test_simple_task_performance(mode: str):
     planner = create_planner_node(workspace)
 
     state = SwarmState(
-        task_description="写一个打印 hello world 的 Python 脚本",
-        workspace=str(workspace),
-        subtasks=[]
+        user_input="写一个打印 hello world 的 Python 脚本",
+        context=None,
+        plan=None,
+        current_subtask_index=0,
+        subtask_results=[],
+        current_code=None,
+        current_code_file=None,
+        review_feedback=None,
+        iteration_count=0,
+        total_tokens=0,
+        start_time=time.time(),
+        status="planning",
+        user_interrupted=False,
+        final_output=None,
+        error_message=None
     )
 
     start_time = time.time()
@@ -60,20 +72,32 @@ async def test_simple_task_performance(mode: str):
     reviewer = create_reviewer_node(workspace)
 
     state = SwarmState(
-        task_description="审查 Hello World 代码",
-        workspace=str(workspace),
+        user_input="审查 Hello World 代码",
+        context=None,
         plan={
             "subtasks": [{
-                "id": 1,
+                "id": "task-1",
+                "type": "code",
                 "description": "Hello World",
-                "language": "python",
-                "acceptance_criteria": ["可运行"]
+                "dependencies": [],
+                "acceptance_criteria": ["可运行"],
+                "tool_name": None,
+                "tool_args": None
             }],
-            "overall_acceptance": "完成"
+            "overall_acceptance": ["完成"]
         },
         current_subtask_index=0,
-        generated_files=[str(test_file)],
-        subtasks=[]
+        subtask_results=[],
+        current_code='print("Hello World")',
+        current_code_file=str(test_file),
+        review_feedback=None,
+        iteration_count=0,
+        total_tokens=0,
+        start_time=time.time(),
+        status="reviewing",
+        user_interrupted=False,
+        final_output=None,
+        error_message=None
     )
 
     start_time = time.time()

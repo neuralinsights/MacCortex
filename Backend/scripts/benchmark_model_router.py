@@ -306,7 +306,7 @@ class BenchmarkRunner:
             successful_reviewer = [r for r in reviewer_results if r.get("success", False)]
             if successful_reviewer:
                 avg_time = sum(r["total_time"] for r in successful_reviewer) / len(successful_reviewer)
-            print(f"  平均执行时间: {avg_time:.2f} 秒")
+                print(f"  平均执行时间: {avg_time:.2f} 秒")
             for r in reviewer_results:
                 status = "✅" if r.get("success", False) else "❌"
                 print(f"  {status} {r['task_name']}: {r.get('total_time', 0):.2f} 秒")
