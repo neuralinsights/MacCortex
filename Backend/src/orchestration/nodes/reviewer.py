@@ -136,6 +136,16 @@ class ReviewerNode:
         Returns:
             更新后的状态（包含审查结果或反馈）
         """
+        # 类型验证：确保 review_feedback 是字典或 None
+        if "review_feedback" in state:
+            feedback = state["review_feedback"]
+            if feedback is not None and not isinstance(feedback, dict):
+                # 防御性编程：如果是字符串，转换为字典格式
+                state["review_feedback"] = {
+                    "passed": False,
+                    "feedback": str(feedback)
+                }
+
         # 获取当前子任务和代码文件
         plan = state.get("plan")
         if not plan:
@@ -199,12 +209,13 @@ class ReviewerNode:
                 state["status"] = "planning"  # 继续下一个子任务
 
             # 清空反馈和当前代码
-            state["review_feedback"] = ""
+            state["review_feedback"] = {}
             state["current_code"] = ""
             state["current_code_file"] = ""
         else:
             # ❌ 审查失败 - 提供反馈给 Coder 重新生成
-            state["review_feedback"] = review_result["feedback"]
+            # 存储完整的审查结果（字典），包含 passed 和 feedback 字段
+            state["review_feedback"] = review_result
             state["status"] = "executing"  # 重新交给 Coder
             state["iteration_count"] += 1
 

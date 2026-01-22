@@ -185,28 +185,33 @@ async def test_three_nodes_complete():
         result = await reviewer(state)
         elapsed = time.time() - start_time
 
+        # 获取审查反馈（字典格式）
         feedback = result.get('review_feedback', {})
-        passed = feedback.get('passed', False)
-        issues = feedback.get('issues', [])
-        suggestions = feedback.get('suggestions', [])
+
+        # 兼容性处理：如果 feedback 是字符串（旧版本），转换为字典
+        if isinstance(feedback, str):
+            # 旧版本：feedback 是字符串
+            passed = not bool(feedback)  # 空字符串表示通过
+            feedback_text = feedback if feedback else "通过"
+        else:
+            # 新版本：feedback 是字典 {"passed": bool, "feedback": str}
+            passed = feedback.get('passed', False)
+            feedback_text = feedback.get('feedback', '')
+
+        # 检查子任务结果判断是否真正通过
+        subtask_results = result.get('subtask_results', [])
+        if subtask_results:
+            last_result = subtask_results[-1]
+            passed = last_result.get('passed', False)
 
         print(f"✅ 代码审查完成")
         print(f"⏱️  执行时间: {elapsed:.2f} 秒")
         print(f"📋 审查结果: {'✅ 通过' if passed else '❌ 需要修改'}")
         print()
 
-        if issues:
-            print(f"发现 {len(issues)} 个问题:")
-            for i, issue in enumerate(issues, 1):
-                print(f"  {i}. {issue}")
-            print()
-
-        if suggestions:
-            print(f"改进建议 ({len(suggestions)} 条):")
-            for i, suggestion in enumerate(suggestions[:3], 1):
-                print(f"  {i}. {suggestion}")
-            if len(suggestions) > 3:
-                print(f"  ... (省略 {len(suggestions) - 3} 条)")
+        if not passed and feedback_text:
+            print("反馈:")
+            print(f"  {feedback_text}")
             print()
 
         print(f"💡 提示: 访问 LangSmith Dashboard 查看 Reviewer 节点的 Token 使用")

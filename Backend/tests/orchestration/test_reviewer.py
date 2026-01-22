@@ -310,7 +310,7 @@ print("Hello, World!")
                 assert result_state["subtask_results"][0]["subtask_id"] == "task-1"
                 assert result_state["current_subtask_index"] == 1
                 assert result_state["status"] == "completed"  # 所有子任务完成
-                assert result_state["review_feedback"] == ""
+                assert result_state["review_feedback"] == {}  # 审查通过时为空字典
 
     async def test_review_failure(self, monkeypatch):
         """测试审查失败的情况"""
@@ -366,8 +366,10 @@ print(divide(10, 0))
 
                 # 验证状态更新
                 assert len(result_state["subtask_results"]) == 0  # 没有成功的结果
-                assert result_state["review_feedback"] != ""
-                assert "ZeroDivisionError" in result_state["review_feedback"]
+                assert result_state["review_feedback"] != {}  # 审查失败时有反馈
+                assert isinstance(result_state["review_feedback"], dict)  # 应该是字典
+                assert result_state["review_feedback"]["passed"] is False
+                assert "ZeroDivisionError" in result_state["review_feedback"]["feedback"]
                 assert result_state["status"] == "executing"  # 回到 Coder
                 assert result_state["iteration_count"] == 1
                 assert result_state["current_subtask_index"] == 0  # 仍在第一个子任务
