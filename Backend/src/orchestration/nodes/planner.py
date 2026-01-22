@@ -55,8 +55,8 @@ class PlannerNode:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 if fallback_to_local:
-                    # 降级到本地 Ollama 模型
-                    from langchain_community.chat_models import ChatOllama
+                    # 降级到本地 Ollama 模型（使用新版 langchain-ollama 包）
+                    from langchain_ollama import ChatOllama
                     print("⚠️  未设置 ANTHROPIC_API_KEY，降级使用本地 Ollama 模型（qwen3:14b）")
                     print("   功能受限：计划质量可能较低，建议设置 Anthropic API 密钥")
                     self.llm = ChatOllama(

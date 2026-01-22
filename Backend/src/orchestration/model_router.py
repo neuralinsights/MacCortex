@@ -119,7 +119,7 @@ class ModelRouter:
 
     def _get_ollama_model(self, temperature: float) -> BaseChatModel:
         """获取 Ollama 本地模型"""
-        from langchain_community.chat_models import ChatOllama
+        from langchain_ollama import ChatOllama
 
         return ChatOllama(
             model=self.ollama_model,

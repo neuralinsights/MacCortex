@@ -54,7 +54,8 @@ class ReflectorNode:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 if fallback_to_local:
-                    from langchain_community.chat_models import ChatOllama
+                    # 使用新版 langchain-ollama 包
+                    from langchain_ollama import ChatOllama
                     print("⚠️  ReflectorNode: 降级使用本地 Ollama 模型（qwen3:14b）")
                     self.llm = ChatOllama(
                         model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
