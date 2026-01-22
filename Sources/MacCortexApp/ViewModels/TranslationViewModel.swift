@@ -359,7 +359,7 @@ class TranslationViewModel: ObservableObject {
         case "cached":
             // 缓存命中
             if let data = event.data.data(using: .utf8),
-               let json = try? JSONDecoder().decode([String: Any].self, from: data) {
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 isCached = json["cached"] as? Bool ?? false
                 if isCached {
                     streamProgress = "缓存命中！"
@@ -383,7 +383,7 @@ class TranslationViewModel: ObservableObject {
             streamProgress = "完成！"
 
             if let data = event.data.data(using: .utf8),
-               let json = try? JSONDecoder().decode([String: Any].self, from: data) {
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
 
                 // 提取完整输出（如果有）
                 if let output = json["output"] as? String {
@@ -470,6 +470,11 @@ class TranslationViewModel: ObservableObject {
     /// 切换剪贴板监听状态
     func toggleClipboardMonitor() {
         clipboardMonitorEnabled.toggle()
+    }
+
+    /// Backend 连接状态（公开访问）
+    var isBackendConnected: Bool {
+        client.isConnected
     }
 }
 

@@ -7,17 +7,18 @@ Supports both in-memory and SQLite-based checkpointing for state persistence.
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+# SQLite checkpoint 在 LangGraph 1.0+ 中已重构，暂时仅使用 MemorySaver
+# from langgraph.checkpoint.sqlite import SqliteSaver  # 已移除
+# from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver  # 已移除
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from .state import SwarmState
 
 
 def create_swarm_graph(
     workspace_path: Path,
-    checkpointer: Optional[Union[MemorySaver, SqliteSaver, AsyncSqliteSaver]] = None
+    checkpointer: Optional[MemorySaver] = None
 ) -> StateGraph:
     """
     创建 Swarm 工作流图

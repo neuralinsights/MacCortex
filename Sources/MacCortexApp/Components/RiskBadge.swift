@@ -111,12 +111,12 @@ struct RiskAssessmentCard: View {
 
             // 操作详情
             VStack(alignment: .leading, spacing: 6) {
-                DetailRow(label: "Pattern", value: assessment.task.patternId)
-                DetailRow(label: "输入来源", value: assessment.task.source.displayName)
-                DetailRow(label: "输出目标", value: assessment.task.outputTarget.displayName)
+                RiskDetailRow(label: "Pattern", value: assessment.task.patternId)
+                RiskDetailRow(label: "输入来源", value: assessment.task.source.displayName)
+                RiskDetailRow(label: "输出目标", value: assessment.task.outputTarget.displayName)
 
                 if let duration = assessment.estimatedDuration {
-                    DetailRow(
+                    RiskDetailRow(
                         label: "预计耗时",
                         value: String(format: "%.1f 秒", duration)
                     )
@@ -133,8 +133,8 @@ struct RiskAssessmentCard: View {
     }
 }
 
-/// 详情行
-private struct DetailRow: View {
+/// 风险详情行
+private struct RiskDetailRow: View {
     let label: String
     let value: String
 

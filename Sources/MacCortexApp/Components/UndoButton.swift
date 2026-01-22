@@ -84,27 +84,27 @@ struct SnapshotCard: View {
 
             // 详情
             VStack(alignment: .leading, spacing: 6) {
-                DetailRow(
+                UndoDetailRow(
                     icon: "doc.text.fill",
                     label: "Pattern",
                     value: snapshot.patternId
                 )
 
-                DetailRow(
+                UndoDetailRow(
                     icon: "internaldrive.fill",
                     label: "大小",
                     value: snapshot.fileSizeFormatted
                 )
 
                 if let filePath = snapshot.filePath {
-                    DetailRow(
+                    UndoDetailRow(
                         icon: "folder.fill",
                         label: "文件",
                         value: filePath.lastPathComponent
                     )
                 }
 
-                DetailRow(
+                UndoDetailRow(
                     icon: "clock.fill",
                     label: "剩余",
                     value: "\(snapshot.remainingDays) 天"
@@ -124,8 +124,8 @@ struct SnapshotCard: View {
     }
 }
 
-/// 详情行（带图标）
-private struct DetailRow: View {
+/// 撤销详情行（带图标）
+private struct UndoDetailRow: View {
     let icon: String
     let label: String
     let value: String

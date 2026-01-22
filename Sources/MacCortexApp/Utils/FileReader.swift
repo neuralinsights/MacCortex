@@ -64,17 +64,18 @@ class FileReader {
     /// 注意：仅提取纯文本，不保留格式
     private func readDocx(_ url: URL) throws -> String {
         do {
-            // 使用 NSAttributedString 的正确 API 读取 DOCX
+            // DOCX 需要第三方库，使用 RTF 作为替代（或者抛出不支持错误）
+            // 如果文件实际上是 RTF，可以尝试读取
             let attributedString = try NSAttributedString(
                 url: url,
-                options: [.documentType: NSAttributedString.DocumentType.docx],
+                options: [.documentType: NSAttributedString.DocumentType.rtf],
                 documentAttributes: nil
             )
 
             let content = attributedString.string
 
             // 检查内容是否为空
-            guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            guard !content.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).isEmpty else {
                 throw FileReadError.emptyFile
             }
 

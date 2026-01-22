@@ -31,7 +31,8 @@ class CoderNode:
         workspace_path: Path,
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.3,
-        llm: Optional[Any] = None
+        llm: Optional[Any] = None,
+        fallback_to_local: bool = True
     ):
         """
         初始化 Coder Node
@@ -41,20 +42,34 @@ class CoderNode:
             model: Claude 模型名称
             temperature: 温度参数（0.3 为代码生成推荐值）
             llm: 可选的 LLM 实例（用于测试时依赖注入）
+            fallback_to_local: 当 API Key 缺失时是否降级到本地模型
         """
         # 使用注入的 LLM 或创建新的 LLM
         if llm is not None:
             self.llm = llm
+            self.using_local_model = False
         else:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+                if fallback_to_local:
+                    from langchain_community.chat_models import ChatOllama
+                    print("⚠️  CoderNode: 降级使用本地 Ollama 模型（qwen3:14b）")
+                    self.llm = ChatOllama(
+                        model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
+                        temperature=temperature,
+                        base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+                    )
+                    self.using_local_model = True
+                else:
+                    raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+            else:
+                self.llm = ChatAnthropic(
+                    model=model,
+                    temperature=temperature,
+                    anthropic_api_key=api_key
+                )
+                self.using_local_model = False
 
-            self.llm = ChatAnthropic(
-                model=model,
-                temperature=temperature,
-                anthropic_api_key=api_key
-            )
         self.workspace = Path(workspace_path)
         self.workspace.mkdir(parents=True, exist_ok=True)
 
@@ -124,7 +139,7 @@ if __name__ == "__main__":
         if not plan:
             raise ValueError("状态中缺少 plan 字段")
 
-        current_index = state["current_subtask_index"]
+        current_index = state.get("current_subtask_index", 0)
         if current_index >= len(plan["subtasks"]):
             raise ValueError(f"子任务索引越界: {current_index}")
 

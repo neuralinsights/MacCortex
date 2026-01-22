@@ -16,63 +16,28 @@
 // 更新时间：2026-01-21 (Phase 2 Day 1: Observation Framework 升级)
 
 import SwiftUI
+import Cocoa
 import Observation
 import PermissionsKit
 import AppIntents
 
 @main
 struct MacCortexApp: App {
-    @State private var appState = AppState()
+    // Week 5: 测试版本 - 使用 AppKit 原生窗口
 
     init() {
-        // Phase 2 Week 3 Day 15: 延迟 App Intents 注册（启动优化）
-        // 不阻塞主启动流程，首次显示后再注册
-        if #available(macOS 13.0, *) {
-            Task.detached(priority: .background) {
-                // 延迟 0.5 秒，等待主窗口显示后再注册
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                MacCortexAppShortcuts.updateAppShortcutParameters()
-            }
-        }
-
-        // Phase 3 Week 3 Day 5: 注册全局快捷键
-        Task { @MainActor in
-            // 延迟 1 秒，等待应用完全启动后再注册
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            GlobalHotKeyManager.shared.registerHotKeys()
-        }
-
-        // Phase 3 Week 4 Day 5: 设置通知权限和类别
-        Task { @MainActor in
-            // 延迟 1.5 秒，等待应用完全启动后再请求通知权限
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-
-            // 设置通知类别（支持交互式操作）
-            NotificationManager.shared.setupNotificationCategories()
-
-            // 请求通知权限
-            try? await NotificationManager.shared.requestAuthorization()
+        // 延迟显示 AppKit 测试窗口
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let windowController = TestWindowController()
+            windowController.showWindow(nil)
+            windowController.window?.makeKeyAndOrderFront(nil)
         }
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(appState)
-                .frame(minWidth: 800, minHeight: 600)
-        }
-        .commands {
-            CommandGroup(replacing: .appInfo) {
-                Button("关于 MacCortex") {
-                    // 显示关于窗口
-                }
-            }
-        }
-
-        // Phase 3 Week 3 后续: 偏好设置窗口（Cmd+,）
-        Settings {
-            SettingsView()
-                .environment(appState)
+                .frame(width: 800, height: 600)
         }
     }
 }
@@ -86,7 +51,7 @@ class AppState {
     // MARK: - 权限状态
     var hasFullDiskAccess: Bool = false
     var hasAccessibilityPermission: Bool = false
-    var isFirstRun: Bool = true
+    var isFirstRun: Bool = false  // Week 5: 跳过首次启动，直接进入主界面
 
     // MARK: - Phase 2: Pattern 执行状态
     var isProcessingPattern: Bool = false

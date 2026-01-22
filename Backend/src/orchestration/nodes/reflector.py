@@ -32,7 +32,8 @@ class ReflectorNode:
         workspace_path: Path,
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.3,
-        llm: Optional[Any] = None  # 可选的 LLM 实例（用于测试）
+        llm: Optional[Any] = None,  # 可选的 LLM 实例（用于测试）
+        fallback_to_local: bool = True
     ):
         """
         初始化 Reflector 节点
@@ -42,21 +43,34 @@ class ReflectorNode:
             model: LLM 模型名称
             temperature: LLM 温度（0.3 适合反思任务）
             llm: 可选的 LLM 实例（用于测试时注入 mock）
+            fallback_to_local: 当 API Key 缺失时是否降级到本地模型
         """
         # 使用提供的 LLM 或创建新的
         if llm is not None:
             self.llm = llm
+            self.using_local_model = False
         else:
             # Anthropic API Key
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
-
-            self.llm = ChatAnthropic(
-                model=model,
-                temperature=temperature,
-                anthropic_api_key=api_key
-            )
+                if fallback_to_local:
+                    from langchain_community.chat_models import ChatOllama
+                    print("⚠️  ReflectorNode: 降级使用本地 Ollama 模型（qwen3:14b）")
+                    self.llm = ChatOllama(
+                        model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
+                        temperature=temperature,
+                        base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+                    )
+                    self.using_local_model = True
+                else:
+                    raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+            else:
+                self.llm = ChatAnthropic(
+                    model=model,
+                    temperature=temperature,
+                    anthropic_api_key=api_key
+                )
+                self.using_local_model = False
 
         self.workspace = Path(workspace_path)
 

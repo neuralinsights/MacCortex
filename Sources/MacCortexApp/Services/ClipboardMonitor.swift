@@ -178,6 +178,8 @@ class ClipboardMonitor: ObservableObject {
     // MARK: - Cleanup
 
     deinit {
-        stopMonitoring()
+        Task { @MainActor in
+            stopMonitoring()
+        }
     }
 }

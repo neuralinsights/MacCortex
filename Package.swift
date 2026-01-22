@@ -34,6 +34,11 @@ let package = Package(
             path: "Sources/MacCortexApp",
             resources: [
                 .process("Resources")
+            ],
+            linkerSettings: [
+                .linkedFramework("Carbon"),
+                .linkedFramework("SwiftUI"),
+                .linkedFramework("AppKit")
             ]
         ),
         

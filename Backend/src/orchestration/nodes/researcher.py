@@ -41,7 +41,8 @@ class ResearcherNode:
         max_search_results: int = 5,
         api_keys: Optional[Dict[str, str]] = None,
         llm: Optional[Any] = None,  # 可选的 LLM 实例（用于测试）
-        search: Optional[Any] = None  # 可选的搜索工具（用于测试）
+        search: Optional[Any] = None,  # 可选的搜索工具（用于测试）
+        fallback_to_local: bool = True
     ):
         """
         初始化 Researcher 节点
@@ -54,20 +55,32 @@ class ResearcherNode:
             api_keys: 外部 API 密钥字典（如 GitHub、OpenWeather）
             llm: 可选的 LLM 实例（用于测试时注入 mock）
             search: 可选的搜索工具（用于测试时注入 mock）
+            fallback_to_local: 当 API Key 缺失时是否降级到本地模型
         """
         # 使用提供的 LLM 或创建新的
         if llm is not None:
             self.llm = llm
+            self.using_local_model = False
         else:
             # Anthropic API Key
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY 环境变量未设置")
-
-            self.llm = ChatAnthropic(
-                model=model,
-                temperature=temperature,
-                anthropic_api_key=api_key
+                if fallback_to_local:
+                    from langchain_community.chat_models import ChatOllama
+                    print("⚠️  ResearcherNode: 降级使用本地 Ollama 模型（qwen3:14b）")
+                    self.llm = ChatOllama(
+                        model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
+                        temperature=temperature,
+                        base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+                    )
+                    self.using_local_model = True
+                else:
+                    raise ValueError("ANTHROPIC_API_KEY 环境变量未设置")
+            else:
+                self.llm = ChatAnthropic(
+                    model=model,
+                    temperature=temperature,
+                    anthropic_api_key=api_key
             )
 
         self.workspace = Path(workspace_path)

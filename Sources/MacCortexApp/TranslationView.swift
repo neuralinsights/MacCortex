@@ -130,7 +130,7 @@ struct TranslationView: View {
             .keyboardShortcut("h", modifiers: .command)
 
             // Backend 连接状态
-            if viewModel.client.isConnected {
+            if viewModel.isBackendConnected {
                 Image(systemName: "circle.fill")
                     .foregroundColor(.green)
                     .font(.system(size: 8))

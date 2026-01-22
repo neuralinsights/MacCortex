@@ -18,6 +18,20 @@
 import SwiftUI
 
 struct ContentView: View {
+    var body: some View {
+        ZStack {
+            Color.red  // 纯红色背景，最明显
+
+            Text("MacCortex 测试")
+                .font(.system(size: 72, weight: .black))
+                .foregroundColor(.white)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+// 备份原版本（暂时不用）
+struct ContentView_Original: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
@@ -38,37 +52,44 @@ struct MainView: View {
     @State private var showSettings = false
     @State private var showUndoHistory = false  // Phase 2 Week 2 Day 10: 撤销历史
     @State private var showMCPServerList = false  // Phase 2 Week 3 Day 11-12: MCP 服务器列表
-    @State private var selectedTab = 0  // Phase 3 Week 2: 标签选择
+    @State private var selectedTab = 0  // Week 5: 默认显示Swarm编排界面
 
     var body: some View {
         TabView(selection: $selectedTab) {
+            // Week 5: Swarm编排界面（默认显示）
+            SwarmOrchestrationView()
+                .tabItem {
+                    Label("Swarm", systemImage: "gearshape.2.fill")
+                }
+                .tag(0)
+
             // Phase 3 Week 2 Day 1-2: 翻译界面
             TranslationView()
                 .tabItem {
                     Label("翻译", systemImage: "character.bubble")
                 }
-                .tag(0)
+                .tag(1)
 
             // Phase 3 Week 2 Day 3-4: 批量翻译界面
             BatchTranslationView()
                 .tabItem {
                     Label("批量", systemImage: "list.bullet")
                 }
-                .tag(1)
+                .tag(2)
 
             // Phase 3 Week 2 Day 5: 缓存统计界面
             CacheStatsView()
                 .tabItem {
                     Label("统计", systemImage: "chart.bar")
                 }
-                .tag(2)
+                .tag(3)
 
             // 原有的权限状态页面
             permissionsView
                 .tabItem {
                     Label("权限", systemImage: "lock.shield")
                 }
-                .tag(3)
+                .tag(4)
         }
     }
 

@@ -37,7 +37,8 @@ class ReviewerNode:
         temperature: float = 0.0,
         timeout: int = 30,
         max_iterations: int = 3,
-        llm: Optional[Any] = None
+        llm: Optional[Any] = None,
+        fallback_to_local: bool = True
     ):
         """
         初始化 Reviewer Node
@@ -49,20 +50,34 @@ class ReviewerNode:
             timeout: 代码执行超时时间（秒）
             max_iterations: 最大迭代次数（防止无限循环）
             llm: 可选的 LLM 实例（用于测试时依赖注入）
+            fallback_to_local: 当 API Key 缺失时是否降级到本地模型
         """
         # 使用注入的 LLM 或创建新的 LLM
         if llm is not None:
             self.llm = llm
+            self.using_local_model = False
         else:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+                if fallback_to_local:
+                    from langchain_community.chat_models import ChatOllama
+                    print("⚠️  ReviewerNode: 降级使用本地 Ollama 模型（qwen3:14b）")
+                    self.llm = ChatOllama(
+                        model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
+                        temperature=temperature,
+                        base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+                    )
+                    self.using_local_model = True
+                else:
+                    raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+            else:
+                self.llm = ChatAnthropic(
+                    model=model,
+                    temperature=temperature,
+                    anthropic_api_key=api_key
+                )
+                self.using_local_model = False
 
-            self.llm = ChatAnthropic(
-                model=model,
-                temperature=temperature,
-                anthropic_api_key=api_key
-            )
         self.workspace = Path(workspace_path)
         self.timeout = timeout
         self.max_iterations = max_iterations
@@ -140,7 +155,7 @@ class ReviewerNode:
             raise FileNotFoundError(f"代码文件不存在: {code_file}")
 
         # 检查是否超过最大迭代次数
-        iteration_count = state["iteration_count"]
+        iteration_count = state.get("iteration_count", 0)
         if iteration_count >= self.max_iterations:
             # 强制标记为失败，进入下一个子任务或结束
             state["subtask_results"].append({

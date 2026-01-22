@@ -299,10 +299,10 @@ class ExportManager {
             }
         }
 
-        // 保存为 DOCX（使用 NSAttributedString 的正确 API）
+        // 保存为 RTF（DOCX 需要第三方库，使用 RTF 作为替代）
         let data = try attributedString.data(
             from: NSRange(location: 0, length: attributedString.length),
-            documentAttributes: [.documentType: NSAttributedString.DocumentType.docx]
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
         )
         try data.write(to: url)
     }

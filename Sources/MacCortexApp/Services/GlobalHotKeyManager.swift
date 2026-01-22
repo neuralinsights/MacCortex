@@ -37,7 +37,7 @@ class GlobalHotKeyManager: ObservableObject {
     private var hotKeyRef: EventHotKeyRef?
 
     /// 热键 ID
-    private let hotKeyID = EventHotKeyID(signature: FourCharCode(truncating: "MCTX" as NSString), id: 1)
+    private let hotKeyID = EventHotKeyID(signature: OSType(0x4D435458), id: 1)  // "MCTX" as FourCharCode
 
     // MARK: - Initialization
 
@@ -49,26 +49,32 @@ class GlobalHotKeyManager: ObservableObject {
 
     /// 注册全局快捷键
     func registerHotKeys() {
+        // TODO: Carbon framework 链接问题，暂时禁用
+        print("[GlobalHotKeyManager] ⚠️  全局快捷键已禁用（Carbon framework 链接问题）")
+        return
+
+        /*
         guard hotKeyRef == nil else {
             print("[GlobalHotKeyManager] 快捷键已注册，跳过")
             return
         }
 
         // 1. 安装事件处理器
-        var eventHandler = EventHandlerUPP { nextHandler, theEvent, userData in
+        let eventHandler = NewEventHandlerUPP { nextHandler, theEvent, userData in
             GlobalHotKeyManager.handleHotKeyEvent(nextHandler, theEvent, userData)
         }
 
         var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                       eventKind: OSType(kEventHotKeyPressed))
 
+        var eventHandlerRef: EventHandlerRef?
         InstallEventHandler(
             GetApplicationEventTarget(),
             eventHandler,
             1,
             &eventSpec,
             nil,
-            nil
+            &eventHandlerRef
         )
 
         // 2. 注册 Cmd+Shift+T
@@ -89,10 +95,15 @@ class GlobalHotKeyManager: ObservableObject {
         } else {
             print("[GlobalHotKeyManager] ❌ 全局快捷键注册失败: \(status)")
         }
+        */
     }
 
     /// 注销全局快捷键
     func unregisterHotKeys() {
+        // TODO: Carbon framework 链接问题，暂时禁用
+        return
+
+        /*
         guard let hotKey = hotKeyRef else {
             return
         }
@@ -105,6 +116,7 @@ class GlobalHotKeyManager: ObservableObject {
         }
 
         hotKeyRef = nil
+        */
     }
 
     // MARK: - Private Methods
@@ -146,7 +158,9 @@ class GlobalHotKeyManager: ObservableObject {
     // MARK: - Cleanup
 
     deinit {
-        unregisterHotKeys()
+        Task { @MainActor in
+            unregisterHotKeys()
+        }
     }
 }
 

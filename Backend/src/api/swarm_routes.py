@@ -544,15 +544,25 @@ async def _execute_task(task_id: str):
         })
 
     except Exception as e:
-        # 任务失败
+        # 任务失败 - 打印详细错误信息
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"\n{'='*60}")
+        print(f"❌ Task {task_id} failed with exception:")
+        print(f"{'='*60}")
+        print(error_details)
+        print(f"{'='*60}\n")
+
         task_manager.update_task(task_id, {
             "status": "failed",
-            "error_message": str(e)
+            "error_message": str(e),
+            "error_traceback": error_details
         })
 
         await task_manager.broadcast_to_websockets(task_id, {
             "type": "error",
             "error_code": "EXECUTION_ERROR",
             "message": str(e),
+            "traceback": error_details,
             "timestamp": datetime.now().isoformat()
         })

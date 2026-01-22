@@ -32,7 +32,8 @@ class PlannerNode:
         temperature: float = 0.2,
         max_subtasks: int = 10,
         min_subtasks: int = 3,
-        llm: Optional[Any] = None
+        llm: Optional[Any] = None,
+        fallback_to_local: bool = True
     ):
         """
         初始化 Planner Node
@@ -43,23 +44,45 @@ class PlannerNode:
             max_subtasks: 最大子任务数量
             min_subtasks: 最小子任务数量
             llm: 可选的 LLM 实例（用于测试时依赖注入）
+            fallback_to_local: 当 API Key 缺失时是否降级到本地模型
         """
         # 使用注入的 LLM 或创建新的 LLM
         if llm is not None:
             self.llm = llm
+            self.using_local_model = False
         else:
             # 检查 API Key
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
-                raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+                if fallback_to_local:
+                    # 降级到本地 Ollama 模型
+                    from langchain_community.chat_models import ChatOllama
+                    print("⚠️  未设置 ANTHROPIC_API_KEY，降级使用本地 Ollama 模型（qwen3:14b）")
+                    print("   功能受限：计划质量可能较低，建议设置 Anthropic API 密钥")
+                    self.llm = ChatOllama(
+                        model=os.getenv("OLLAMA_MODEL", "qwen3:14b"),
+                        temperature=temperature,
+                        base_url=os.getenv("OLLAMA_HOST", "http://localhost:11434")
+                    )
+                    self.using_local_model = True
+                else:
+                    raise ValueError("未设置 ANTHROPIC_API_KEY 环境变量")
+            else:
+                self.llm = ChatAnthropic(
+                    model=model,
+                    temperature=temperature,
+                    anthropic_api_key=api_key
+                )
+                self.using_local_model = False
 
-            self.llm = ChatAnthropic(
-                model=model,
-                temperature=temperature,
-                anthropic_api_key=api_key
-            )
         self.max_subtasks = max_subtasks
-        self.min_subtasks = min_subtasks
+
+        # 本地模型降低要求：最小子任务数设为 1
+        if self.using_local_model:
+            self.min_subtasks = 1
+            print("   本地模型模式：已降低最小子任务要求至 1 个（适配本地模型能力）")
+        else:
+            self.min_subtasks = min_subtasks
 
         self.system_prompt = self._build_system_prompt()
 
@@ -70,6 +93,48 @@ class PlannerNode:
         Returns:
             str: 详细的系统提示词
         """
+        # 本地模型使用简化的提示词
+        if self.using_local_model:
+            return f"""你是任务规划师。将用户任务拆解为子任务。
+
+⚠️ 重要：必须严格输出 JSON 格式，不要有任何额外文字！
+
+输出格式（直接输出 JSON，不要包裹在代码块中）：
+{{
+  "subtasks": [
+    {{
+      "id": "task-1",
+      "type": "code",
+      "description": "具体的任务描述",
+      "dependencies": [],
+      "acceptance_criteria": ["标准1", "标准2"]
+    }}
+  ],
+  "overall_acceptance": ["整体标准1", "整体标准2"]
+}}
+
+子任务类型：
+- code: 编写代码
+- research: 查找资料
+- tool: 执行系统操作
+
+示例（简单任务：创建 hello.py 打印 Hello World）：
+{{
+  "subtasks": [
+    {{
+      "id": "task-1",
+      "type": "code",
+      "description": "创建 hello.py 文件并写入打印语句",
+      "dependencies": [],
+      "acceptance_criteria": ["文件包含 print('Hello World')", "可以运行 python hello.py"]
+    }}
+  ],
+  "overall_acceptance": ["hello.py 文件存在", "运行输出 Hello World"]
+}}
+
+现在处理用户任务，只输出 JSON："""
+
+        # Claude API 使用详细的提示词
         return f"""你是一个专业的任务规划师（Task Planner），擅长将复杂任务拆解为可执行的子任务。
 
 你的职责：

@@ -49,7 +49,9 @@ class CacheStatsViewModel: ObservableObject {
     }
 
     deinit {
-        stopAutoRefresh()
+        Task { @MainActor in
+            stopAutoRefresh()
+        }
     }
 
     // MARK: - Public Methods
