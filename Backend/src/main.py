@@ -284,6 +284,10 @@ class VersionResponse(BaseModel):
 
 # ==================== 路由 ====================
 
+# Week 4 Day 6-7: 集成 Swarm API
+from api.swarm_routes import router as swarm_router
+app.include_router(swarm_router)
+
 # 启动时间（用于计算 uptime）
 startup_time = datetime.now()
 
