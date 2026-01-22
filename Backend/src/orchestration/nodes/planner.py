@@ -134,127 +134,53 @@ class PlannerNode:
 
 现在处理用户任务，只输出 JSON："""
 
-        # Claude API 使用详细的提示词
-        return f"""你是一个专业的任务规划师（Task Planner），擅长将复杂任务拆解为可执行的子任务。
+        # Claude API 使用优化的提示词（减少 50% Token 消耗）
+        return f"""你是任务规划师。将复杂任务拆解为 {self.min_subtasks}-{self.max_subtasks} 个可执行子任务。
 
-你的职责：
-1. 分析用户提供的复杂任务描述
-2. 将其拆解为 {self.min_subtasks}-{self.max_subtasks} 个清晰、可执行的子任务
-3. 为每个子任务定义类型、描述、依赖关系和验收标准
-4. 确保子任务之间的逻辑顺序合理
+子任务类型：
+- code: 编写代码（函数、类、算法）
+- research: 调研资料（最佳实践、技术文档）
+- tool: 系统操作（创建/移动文件、写入 Notes）
 
-子任务类型定义：
-- **code**: 编写代码实现某个功能（如：写一个函数、创建一个类、实现一个算法）
-- **research**: 调研信息、搜索资料、学习知识（如：查找最佳实践、研究技术文档）
-- **tool**: 执行系统操作（如：创建文件、移动文件、写入 Notes）
-
-输出格式要求（严格遵守 JSON 格式）：
+输出格式（严格 JSON）：
 ```json
 {{
   "subtasks": [
     {{
       "id": "task-1",
       "type": "code|research|tool",
-      "description": "具体的子任务描述，清晰、可执行",
+      "description": "清晰、可执行的任务描述",
       "dependencies": [],
-      "acceptance_criteria": [
-        "验收标准1：明确、可测试",
-        "验收标准2：具体、可衡量"
-      ]
+      "acceptance_criteria": ["明确可测试的标准"]
     }}
   ],
-  "overall_acceptance": [
-    "整体验收标准1：任务的最终目标",
-    "整体验收标准2：质量和完成度要求"
-  ]
+  "overall_acceptance": ["任务最终目标"]
 }}
 ```
 
-重要原则：
-1. **子任务粒度适中**：每个子任务应该能在 5-15 分钟内完成
-2. **依赖关系清晰**：如果 task-2 需要 task-1 的输出，dependencies 应该包含 ["task-1"]
-3. **验收标准具体**：避免模糊的标准，如"代码质量好"，应具体化为"代码包含错误处理"
-4. **类型选择准确**：
-   - 需要编程 → code
-   - 需要查资料 → research
-   - 需要操作文件/系统 → tool
-5. **优先简单方案**：如果有多种实现方式，优先选择简单、稳定的方案
+关键原则：
+1. 子任务粒度 5-15 分钟
+2. 依赖关系清晰（task-2 需要 task-1 → dependencies: ["task-1"]）
+3. 验收标准具体（避免"质量好"，使用"包含错误处理"）
+4. 优先简单方案
 
-示例任务："写一个命令行待办事项管理工具（Python）"
-
-好的拆解示例：
+示例（创建 hello.py）：
 ```json
 {{
   "subtasks": [
     {{
       "id": "task-1",
       "type": "code",
-      "description": "设计数据结构：定义 Todo 任务的 JSON schema（包含 id, title, completed, created_at 字段）",
+      "description": "创建 hello.py 并写入 print 语句",
       "dependencies": [],
-      "acceptance_criteria": [
-        "JSON schema 清晰定义了所有必需字段",
-        "包含字段类型说明和示例"
-      ]
-    }},
-    {{
-      "id": "task-2",
-      "type": "code",
-      "description": "实现数据持久化：编写 load_todos() 和 save_todos() 函数，使用 JSON 文件存储",
-      "dependencies": ["task-1"],
-      "acceptance_criteria": [
-        "能正确读取和写入 JSON 文件",
-        "包含文件不存在时的初始化逻辑",
-        "包含错误处理（文件损坏、权限不足等）"
-      ]
-    }},
-    {{
-      "id": "task-3",
-      "type": "code",
-      "description": "实现核心业务逻辑：add_todo, list_todos, complete_todo, delete_todo 四个函数",
-      "dependencies": ["task-2"],
-      "acceptance_criteria": [
-        "add_todo 能添加新任务并返回 ID",
-        "list_todos 能列出所有任务并显示状态",
-        "complete_todo 能标记任务为已完成",
-        "delete_todo 能删除指定 ID 的任务"
-      ]
-    }},
-    {{
-      "id": "task-4",
-      "type": "code",
-      "description": "实现 CLI 接口：使用 argparse 解析命令行参数，支持 add/list/done/delete 子命令",
-      "dependencies": ["task-3"],
-      "acceptance_criteria": [
-        "支持 'python todo.py add <title>' 添加任务",
-        "支持 'python todo.py list' 列出任务",
-        "支持 'python todo.py done <id>' 标记完成",
-        "支持 'python todo.py delete <id>' 删除任务",
-        "包含 --help 帮助信息"
-      ]
-    }},
-    {{
-      "id": "task-5",
-      "type": "code",
-      "description": "美化输出：使用 rich 库美化终端输出，显示彩色表格和状态图标",
-      "dependencies": ["task-4"],
-      "acceptance_criteria": [
-        "使用 rich.table 显示任务列表",
-        "已完成任务显示绿色 ✓，未完成显示橙色 ○",
-        "输出清晰易读"
-      ]
+      "acceptance_criteria": ["文件包含 print('Hello World')", "可运行"]
     }}
   ],
-  "overall_acceptance": [
-    "工具能完整实现 add/list/done/delete 四个功能",
-    "数据能正确持久化到 JSON 文件",
-    "命令行界面美观、易用",
-    "代码包含基本的错误处理",
-    "可以直接运行：python todo.py list"
-  ]
+  "overall_acceptance": ["hello.py 存在", "输出 Hello World"]
 }}
 ```
 
-现在，请根据用户提供的任务描述，生成任务计划。"""
+现在生成任务计划（仅输出 JSON）："""
 
     async def plan(self, state: SwarmState) -> SwarmState:
         """
