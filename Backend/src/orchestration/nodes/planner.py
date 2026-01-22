@@ -457,6 +457,17 @@ def create_planner_node(
     Returns:
         Planner 节点函数
     """
+    # 如果未提供 llm，使用 ModelRouter
+    if "llm" not in kwargs:
+        from ..model_router import get_model_router, TaskComplexity
+        router = get_model_router()
+        llm, model_name = router.get_model(
+            complexity=kwargs.pop("complexity", TaskComplexity.MEDIUM),
+            temperature=kwargs.get("temperature", 0.2)
+        )
+        kwargs["llm"] = llm
+        print(f"[Planner] 使用模型: {model_name}")
+
     planner = PlannerNode(**kwargs)
 
     async def planner_node(state: SwarmState) -> SwarmState:

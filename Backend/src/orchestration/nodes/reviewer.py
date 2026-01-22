@@ -411,6 +411,17 @@ def create_reviewer_node(
     Returns:
         Reviewer 节点函数
     """
+    # 如果未提供 llm，使用 ModelRouter
+    if "llm" not in kwargs:
+        from ..model_router import get_model_router, TaskComplexity
+        router = get_model_router()
+        llm, model_name = router.get_model(
+            complexity=kwargs.pop("complexity", TaskComplexity.SIMPLE),
+            temperature=kwargs.get("temperature", 0.0)
+        )
+        kwargs["llm"] = llm
+        print(f"[Reviewer] 使用模型: {model_name}")
+
     reviewer = ReviewerNode(workspace_path, **kwargs)
 
     async def reviewer_node(state: SwarmState) -> SwarmState:
