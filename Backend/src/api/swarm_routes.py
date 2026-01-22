@@ -499,8 +499,9 @@ async def _execute_task(task_id: str):
                         "current_agent": node_name
                     })
 
-                    # 更新 Agent 状态
-                    agents_status = task.get("agents_status", {})
+                    # 更新 Agent 状态（获取最新状态）
+                    current_task = task_manager.get_task(task_id)
+                    agents_status = current_task.get("agents_status", {}) if current_task else {}
                     if node_name in agents_status:
                         agents_status[node_name] = "running"
                         task_manager.update_task(task_id, {"agents_status": agents_status})
@@ -513,8 +514,12 @@ async def _execute_task(task_id: str):
                         "timestamp": datetime.now().isoformat()
                     })
 
-                    # 模拟进度更新（简化版）
+                    # 进度更新（包含中间节点）
+                    # 主要 agent 序列
                     agent_sequence = ["planner", "coder", "reviewer", "tool_runner", "reflector"]
+                    # 中间处理节点（不计入主进度）
+                    intermediate_nodes = ["stop_condition"]
+
                     if node_name in agent_sequence:
                         progress = (agent_sequence.index(node_name) + 1) / len(agent_sequence)
                         task_manager.update_task(task_id, {"progress": progress})
@@ -525,8 +530,17 @@ async def _execute_task(task_id: str):
                             "current_step": node_name,
                             "total_steps": len(agent_sequence)
                         })
+                    elif node_name in intermediate_nodes:
+                        # 中间节点：广播但不更新主进度
+                        await task_manager.broadcast_to_websockets(task_id, {
+                            "type": "intermediate_step",
+                            "step": node_name,
+                            "message": "处理中..."
+                        })
 
-                    # 标记 Agent 完成
+                    # 标记 Agent 完成（获取最新状态）
+                    current_task = task_manager.get_task(task_id)
+                    agents_status = current_task.get("agents_status", {}) if current_task else {}
                     if node_name in agents_status:
                         agents_status[node_name] = "completed"
                         task_manager.update_task(task_id, {"agents_status": agents_status})
