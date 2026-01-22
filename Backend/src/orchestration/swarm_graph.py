@@ -53,6 +53,15 @@ def create_full_swarm_graph(
     Returns:
         编译后的 StateGraph
     """
+    # ← 新增：验证 HITL 配置
+    tool_runner_config = agent_kwargs.get("tool_runner", {})
+    if tool_runner_config.get("require_approval") and not checkpointer:
+        raise ValueError(
+            "Human-in-the-Loop requires checkpointer. "
+            "Either set require_approval=False in tool_runner config, "
+            "or provide a checkpointer (e.g., InMemorySaver() or MemorySaver())"
+        )
+
     # 创建状态图
     graph = StateGraph(SwarmState)
 
