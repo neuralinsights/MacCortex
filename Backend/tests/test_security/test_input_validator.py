@@ -229,7 +229,7 @@ class TestParameterValidation:
 
     def test_translate_invalid_target_language(self, validator):
         """测试 translate Pattern 的无效目标语言"""
-        params = {"target_language": "ru-RU"}  # 不支持俄语
+        params = {"target_language": "pt-BR"}  # 不支持葡萄牙语
         is_valid, error, validated = validator.validate_parameters("translate", params)
         assert is_valid is False
         assert "target_language" in error

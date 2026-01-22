@@ -28,13 +28,24 @@ from src.orchestration.state import create_initial_state
 class TestReviewerInitialization:
     """测试 Reviewer 初始化"""
 
-    def test_init_without_api_key(self, monkeypatch):
-        """测试缺少 API 密钥时抛出异常"""
+    def test_init_without_api_key_fallback_disabled(self, monkeypatch):
+        """测试缺少 API 密钥且禁用降级时抛出异常"""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with pytest.raises(ValueError, match="未设置 ANTHROPIC_API_KEY"):
-                ReviewerNode(Path(tmpdir))
+                ReviewerNode(Path(tmpdir), fallback_to_local=False)
+
+    def test_init_without_api_key_fallback_enabled(self, monkeypatch):
+        """测试缺少 API 密钥时降级到本地 Ollama 模型"""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            reviewer = ReviewerNode(Path(tmpdir), fallback_to_local=True)
+
+            assert reviewer.workspace == Path(tmpdir)
+            assert reviewer.llm is not None
+            assert reviewer.using_local_model is True
 
     def test_init_with_api_key(self, monkeypatch):
         """测试成功初始化"""

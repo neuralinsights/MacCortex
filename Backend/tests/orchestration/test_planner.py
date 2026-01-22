@@ -34,12 +34,21 @@ class TestPlannerNodeBasic:
         assert planner.llm is not None
         assert planner.system_prompt is not None
 
-    def test_planner_requires_api_key(self, monkeypatch):
-        """测试 Planner 需要 API Key"""
+    def test_planner_requires_api_key_fallback_disabled(self, monkeypatch):
+        """测试 Planner 需要 API Key（禁用降级时）"""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         with pytest.raises(ValueError, match="未设置 ANTHROPIC_API_KEY"):
-            PlannerNode()
+            PlannerNode(fallback_to_local=False)
+
+    def test_planner_fallback_to_local(self, monkeypatch):
+        """测试 Planner 降级到本地模型"""
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+        planner = PlannerNode(fallback_to_local=True)
+
+        assert planner.llm is not None
+        assert planner.using_local_model is True
 
     def test_build_system_prompt(self, mock_api_key):
         """测试系统提示词构建"""
