@@ -87,6 +87,24 @@ class ReviewerNode:
 
     def _build_system_prompt(self) -> str:
         """构建系统提示词"""
+        # 本地模型使用简化的提示词（减少 token 生成时间）
+        if self.using_local_model:
+            return """你是代码审查专家。审查代码执行结果。
+
+⚠️ 必须输出 JSON 格式！
+
+审查：
+1. 代码是否运行成功
+2. 输出是否符合预期
+
+输出格式（直接输出 JSON）：
+{"passed": true, "feedback": "通过"}
+或
+{"passed": false, "feedback": "问题：xxx 修复：xxx"}
+
+只输出 JSON，不要其他文字。"""
+
+        # Claude API 使用详细的提示词
         return """你是一个严谨的代码审查专家。你的任务是执行代码并审查结果。
 
 审查要点：

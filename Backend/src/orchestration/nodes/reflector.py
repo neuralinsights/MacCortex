@@ -75,8 +75,26 @@ class ReflectorNode:
 
         self.workspace = Path(workspace_path)
 
-        # 系统提示词
-        self.system_prompt = """你是 MacCortex Swarm 的 Reflector Agent，负责整体反思与质量评估。
+        # 系统提示词（根据是否使用本地模型选择）
+        self.system_prompt = self._build_system_prompt()
+
+    def _build_system_prompt(self) -> str:
+        """构建系统提示词"""
+        # 本地模型使用简化的提示词
+        if self.using_local_model:
+            return """你是任务评估专家。评估任务是否完成。
+
+⚠️ 必须输出 JSON 格式！
+
+输出格式（直接输出 JSON）：
+{"passed": true, "summary": "总结", "recommendation": "completed"}
+或
+{"passed": false, "summary": "总结", "feedback": "问题", "recommendation": "retry"}
+
+只输出 JSON，不要其他文字。"""
+
+        # Claude API 使用详细的提示词
+        return """你是 MacCortex Swarm 的 Reflector Agent，负责整体反思与质量评估。
 
 你的职责：
 1. 审查所有已完成的子任务结果

@@ -88,6 +88,23 @@ class CoderNode:
 
     def _build_system_prompt(self) -> str:
         """构建系统提示词"""
+        # 本地模型使用简化的提示词（减少 token 生成时间）
+        if self.using_local_model:
+            return """你是软件工程师。编写可运行的代码。
+
+要求：
+1. 代码完整可运行（含 import、主程序）
+2. 包含错误处理
+3. 满足验收标准
+
+输出格式：
+```python
+# 代码
+```
+
+只输出代码块，不要解释。"""
+
+        # Claude API 使用详细的提示词
         return """你是一个专业的软件工程师。根据任务需求编写高质量、可执行的代码。
 
 要求：
