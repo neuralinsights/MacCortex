@@ -190,8 +190,8 @@ class HITLHelper:
     @staticmethod
     def _get_timestamp() -> str:
         """获取当前时间戳（UTC ISO 8601）"""
-        from datetime import datetime
-        return datetime.utcnow().isoformat() + "Z"
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).isoformat() + "Z"
 
 
 class RiskAssessor:

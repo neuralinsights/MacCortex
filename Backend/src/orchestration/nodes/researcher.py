@@ -13,7 +13,7 @@ import json
 import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_anthropic import ChatAnthropic
@@ -156,7 +156,7 @@ class ResearcherNode:
                 "research_result": research_result if not is_error else None,
                 "passed": not is_error,
                 "error_message": research_result if is_error else None,
-                "completed_at": datetime.utcnow().isoformat()
+                "completed_at": datetime.now(timezone.utc).isoformat()
             })
 
             # 3. 更新状态
@@ -175,7 +175,7 @@ class ResearcherNode:
                 "subtask_description": subtask["description"],
                 "passed": False,
                 "error_message": f"调研失败：{str(e)}",
-                "completed_at": datetime.utcnow().isoformat()
+                "completed_at": datetime.now(timezone.utc).isoformat()
             })
 
             # 继续下一个任务（调研失败不阻塞流程）

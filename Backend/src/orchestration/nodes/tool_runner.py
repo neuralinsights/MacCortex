@@ -13,7 +13,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from langgraph.types import interrupt
 
 from ..state import SwarmState
@@ -129,7 +129,7 @@ class ToolRunnerNode:
                     "subtask_description": subtask["description"],
                     "passed": False,
                     "error_message": "用户拒绝执行工具",
-                    "completed_at": datetime.utcnow().isoformat()
+                    "completed_at": datetime.now(timezone.utc).isoformat()
                 })
                 state["current_subtask_index"] += 1
                 if state["current_subtask_index"] >= len(subtasks):
@@ -170,7 +170,7 @@ class ToolRunnerNode:
                 "tool_result": tool_result if not is_error else None,
                 "passed": not is_error,
                 "error_message": tool_result if is_error else None,
-                "completed_at": datetime.utcnow().isoformat()
+                "completed_at": datetime.now(timezone.utc).isoformat()
             })
 
             # 4. 更新状态
@@ -189,7 +189,7 @@ class ToolRunnerNode:
                 "subtask_description": subtask["description"],
                 "passed": False,
                 "error_message": f"工具执行失败：{str(e)}",
-                "completed_at": datetime.utcnow().isoformat()
+                "completed_at": datetime.now(timezone.utc).isoformat()
             })
 
             # 继续下一个任务（工具失败不阻塞流程）
