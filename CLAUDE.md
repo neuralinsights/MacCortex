@@ -24,12 +24,33 @@
 ## 项目基础信息
 
 - **项目名称**：MacCortex
-- **当前版本**：0.5.0 (Build 1)
+- **当前版本**：v1.0.0-phase4-rc1
+- **状态**：Phase 4 Complete (Swarm Intelligence Ready) 🚀
 - **Bundle ID**：com.maccortex.app
 - **Team ID**：CSRKUK3CQV
-- **主要语言**：Swift
-- **平台**：macOS 26.2+ (ARM64)
+- **主要语言**：Swift (Frontend) + Python (Backend)
+- **平台**：macOS 14.0+ (ARM64)
 - **项目路径**：/Users/jamesg/projects/MacCortex
+
+---
+
+## 最近成就 (Phase 4 Week 1)
+
+### 🏆 Swarm Intelligence 核心引擎
+- **6 大 Agent 节点**: Planner, Coder, Reviewer, Researcher, ToolRunner, Reflector 全部实现
+- **LangGraph 状态机**: 完整的自纠错工作流
+- **测试覆盖**: 250 个测试，236 个通过 (94.4%)
+- **修复**: Sparkle.framework 加载问题 (P0), datetime deprecation warnings
+
+## 下一步计划 (Phase 4 Week 2)
+
+### 📚 文档与 Demo
+- [ ] 完善用户指南与 API 文档
+- [ ] 录制 5 个典型场景的 Demo 视频
+
+### 🖥️ GUI 集成 (Phase 5)
+- [ ] Swift ↔ Python 桥接
+- [ ] SwiftUI 任务进度界面
 
 ---
 
