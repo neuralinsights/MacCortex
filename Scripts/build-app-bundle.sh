@@ -74,6 +74,14 @@ find "${BUILD_DIR}" -name "*.framework" -maxdepth 1 -exec cp -R {} "${APP_BUNDLE
 
 if [ -d "${APP_BUNDLE}/Contents/Frameworks/Sparkle.framework" ]; then
     echo "✅ Sparkle.framework 已复制"
+    
+    # 修复 Sparkle.framework 的 install_name（解决 @rpath 加载问题）
+    SPARKLE_BINARY="${APP_BUNDLE}/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle"
+    if [ -f "${SPARKLE_BINARY}" ]; then
+        echo "🔧 修复 Sparkle.framework install_name..."
+        install_name_tool -id "@rpath/Sparkle.framework/Versions/B/Sparkle" "${SPARKLE_BINARY}" 2>/dev/null || true
+        echo "✅ Sparkle.framework install_name 已修复"
+    fi
 else
     echo "⚠️  警告：未找到 Sparkle.framework"
 fi
