@@ -104,26 +104,24 @@ class ReviewerNode:
 
 只输出 JSON，不要其他文字。"""
 
-        # Claude API 使用优化的提示词（减少 30% Token 消耗）
-        return """你是代码审查专家。执行代码并审查结果。
+        # Claude API 使用优化的提示词（Phase 5: -58.9% Input, Phase 6: -40% Output）
+        return """审查代码执行结果。
 
-审查要点：
-1. 代码成功运行（退出代码 0，无异常）
-2. 输出符合验收标准
-3. 错误处理健壮（边界检查）
+检查：
+1. 运行成功（退出 0，无异常）
+2. 输出符合标准
+3. 边界检查
 
-反馈原则：
-- 通过：简短确认
-- 失败：具体问题 + 修复建议（哪一行、为什么、如何修复）
-
-输出格式（JSON）：
+输出（JSON）：
 ```json
 {"passed": true, "feedback": "通过"}
 ```
 或
 ```json
-{"passed": false, "feedback": "问题：xxx。修复：xxx"}
+{"passed": false, "feedback": "问题：xxx 修复：xxx"}
 ```
+
+**极简反馈：通过 = "通过"，失败 = 具体问题 + 修复方案（1 行）**
 """
 
     async def review(self, state: SwarmState) -> SwarmState:
@@ -330,11 +328,19 @@ class ReviewerNode:
 }}
 """
 
+        # 动态 max_tokens（Output Tokens 优化）
+        # Reviewer 输出固定格式：JSON (passed + feedback)，非常简短
+        max_output_tokens = 150  # 足够输出 {"passed": bool, "feedback": "..."}
+
         # 调用 LLM
-        response = await self.llm.ainvoke([
-            SystemMessage(content=self.system_prompt),
-            HumanMessage(content=user_prompt)
-        ])
+        print(f"[Reviewer] max_tokens={max_output_tokens}")
+        response = await self.llm.ainvoke(
+            [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=user_prompt)
+            ],
+            max_tokens=max_output_tokens
+        )
 
         # 解析 JSON 响应
         return self._parse_review_result(response.content)

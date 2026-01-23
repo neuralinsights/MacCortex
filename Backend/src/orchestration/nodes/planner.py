@@ -134,53 +134,24 @@ class PlannerNode:
 
 现在处理用户任务，只输出 JSON："""
 
-        # Claude API 使用优化的提示词（减少 50% Token 消耗）
-        return f"""你是任务规划师。将复杂任务拆解为 {self.min_subtasks}-{self.max_subtasks} 个可执行子任务。
+        # Claude API 使用优化的提示词（Phase 5: -67.5% Input, Phase 6: -30% Output）
+        return f"""任务拆解为 {self.min_subtasks}-{self.max_subtasks} 子任务。输出极简 JSON。
 
-子任务类型：
-- code: 编写代码（函数、类、算法）
-- research: 调研资料（最佳实践、技术文档）
-- tool: 系统操作（创建/移动文件、写入 Notes）
+类型：code（代码）/ research（调研）/ tool（文件操作）
 
-输出格式（严格 JSON）：
+格式（严格）：
 ```json
-{{
-  "subtasks": [
-    {{
-      "id": "task-1",
-      "type": "code|research|tool",
-      "description": "清晰、可执行的任务描述",
-      "dependencies": [],
-      "acceptance_criteria": ["明确可测试的标准"]
-    }}
-  ],
-  "overall_acceptance": ["任务最终目标"]
-}}
+{{"subtasks":[{{"id":"task-1","type":"code","description":"创建 hello.py 含 print","dependencies":[],"acceptance_criteria":["含 print('Hello World')","可运行"]}}],"overall_acceptance":["hello.py 存在","输出 Hello World"]}}
 ```
 
-关键原则：
-1. 子任务粒度 5-15 分钟
-2. 依赖关系清晰（task-2 需要 task-1 → dependencies: ["task-1"]）
-3. 验收标准具体（避免"质量好"，使用"包含错误处理"）
-4. 优先简单方案
+原则：
+1. 粒度 5-15 分钟
+2. 依赖清晰（task-2 需 task-1 → dependencies:["task-1"]）
+3. 标准具体（避免"好"，用"含错误处理"）
+4. 简单方案优先
+5. **极简输出**：最短描述，无冗余
 
-示例（创建 hello.py）：
-```json
-{{
-  "subtasks": [
-    {{
-      "id": "task-1",
-      "type": "code",
-      "description": "创建 hello.py 并写入 print 语句",
-      "dependencies": [],
-      "acceptance_criteria": ["文件包含 print('Hello World')", "可运行"]
-    }}
-  ],
-  "overall_acceptance": ["hello.py 存在", "输出 Hello World"]
-}}
-```
-
-现在生成任务计划（仅输出 JSON）："""
+现在生成计划（仅 JSON）："""
 
     async def plan(self, state: SwarmState) -> SwarmState:
         """
@@ -198,12 +169,25 @@ class PlannerNode:
         # 构建用户提示
         user_prompt = self._build_user_prompt(user_task, context)
 
+        # 评估任务复杂度，设置动态 max_tokens（Output Tokens 优化）
+        task_complexity_for_max_tokens = self._evaluate_task_complexity(user_task)
+        if task_complexity_for_max_tokens == "simple":
+            max_output_tokens = 200  # 简单任务：1-2 个子任务，精简计划
+        elif task_complexity_for_max_tokens == "complex":
+            max_output_tokens = 800  # 复杂任务：5-10 个子任务，详细计划
+        else:
+            max_output_tokens = 400  # 中等任务：3-5 个子任务
+
         # 调用 LLM
         print(f"[Planner] 开始拆解任务: {user_task}")
-        response = await self.llm.ainvoke([
-            SystemMessage(content=self.system_prompt),
-            HumanMessage(content=user_prompt)
-        ])
+        print(f"[Planner] max_tokens={max_output_tokens} (复杂度: {task_complexity_for_max_tokens})")
+        response = await self.llm.ainvoke(
+            [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=user_prompt)
+            ],
+            max_tokens=max_output_tokens
+        )
 
         # 解析 LLM 输出
         try:

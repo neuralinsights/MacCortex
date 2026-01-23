@@ -55,10 +55,11 @@ class TestPlannerNodeBasic:
         planner = PlannerNode(min_subtasks=3, max_subtasks=10)
         prompt = planner.system_prompt
 
-        assert "任务规划师" in prompt
-        assert "3-10" in prompt
-        assert "code|research|tool" in prompt
-        assert "JSON" in prompt
+        # Phase 6 Output Tokens 优化后的提示词验证
+        assert "3-10" in prompt  # 子任务数量范围
+        assert "code" in prompt  # 任务类型
+        assert "JSON" in prompt  # 输出格式
+        assert "极简" in prompt  # Output Tokens 优化关键词
 
     def test_build_user_prompt_simple(self, mock_api_key):
         """测试用户提示词构建（无上下文）"""

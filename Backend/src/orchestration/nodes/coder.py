@@ -104,25 +104,26 @@ class CoderNode:
 
 只输出代码块，不要解释。"""
 
-        # Claude API 使用优化的提示词（减少 30% Token 消耗）
-        return """你是软件工程师。编写可执行代码。
+        # Claude API 使用优化的提示词（Phase 5: -57.5% Input, Phase 6: -30% Output）
+        return """编写可运行代码。
 
 要求：
-1. 完整可运行（import、函数、主程序）
-2. 包含错误处理（try-except、边界检查）
-3. 清晰注释（关键逻辑）
-4. 遵循最佳实践
+1. 完整（import、函数、main）
+2. 错误处理（try-except、边界检查）
+3. **简短注释**（仅关键逻辑，无冗余文档）
+4. 最佳实践
 5. 满足验收标准
 
-输出格式（Markdown 代码块，指定语言，仅代码）：
+输出（Markdown 代码块，仅代码）：
 ```python
 def add(a, b):
-    \"\"\"加法\"\"\"
     return a + b
 
 if __name__ == "__main__":
     print(add(1, 2))
 ```
+
+**核心代码，最少注释，无冗余。**
 """
 
     async def code(self, state: SwarmState) -> SwarmState:
@@ -157,11 +158,25 @@ if __name__ == "__main__":
             previous_code=previous_code
         )
 
+        # 动态 max_tokens（Output Tokens 优化）
+        # 基于子任务描述长度推断复杂度
+        desc_len = len(subtask["description"])
+        if desc_len < 40:
+            max_output_tokens = 300  # 简单任务：Hello World、单函数
+        elif desc_len > 100:
+            max_output_tokens = 1200  # 复杂任务：完整模块
+        else:
+            max_output_tokens = 600  # 中等任务：多函数、测试
+
         # 调用 LLM 生成代码
-        response = await self.llm.ainvoke([
-            SystemMessage(content=self.system_prompt),
-            HumanMessage(content=user_prompt)
-        ])
+        print(f"[Coder] max_tokens={max_output_tokens} (描述长度: {desc_len})")
+        response = await self.llm.ainvoke(
+            [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=user_prompt)
+            ],
+            max_tokens=max_output_tokens
+        )
 
         # 提取代码
         code, language = self._extract_code(response.content)
