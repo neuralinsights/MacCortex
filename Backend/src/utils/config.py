@@ -47,6 +47,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra='allow',  # 允许额外的环境变量（如 langchain_*, anthropic_api_key）
     )
 
 
