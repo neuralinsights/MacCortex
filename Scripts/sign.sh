@@ -54,7 +54,53 @@ if [ ! -f "$ENTITLEMENTS" ]; then
     exit 1
 fi
 
-# 签名顺序：XPC Services → Frameworks → App
+# 签名顺序：Python Backend → XPC Services → Frameworks → App
+PYTHON_ENTITLEMENTS="Resources/Entitlements/PythonBackend.entitlements"
+
+echo "步骤 0/3: 签名 Python 后端..."
+PYTHON_BACKEND_DIR="${APP_PATH}/Contents/Resources/python_backend"
+if [ -d "${PYTHON_BACKEND_DIR}" ]; then
+    if [ -f "$PYTHON_ENTITLEMENTS" ]; then
+        # 先签名所有 .so 和 .dylib 文件
+        find "${PYTHON_BACKEND_DIR}" \( -name "*.so" -o -name "*.dylib" \) | while read lib; do
+            codesign --force --sign "$DEVELOPER_ID" \
+                     --options runtime \
+                     --timestamp \
+                     --entitlements "$PYTHON_ENTITLEMENTS" \
+                     "$lib" 2>/dev/null || true
+        done
+        echo "  ✅ 动态库已签名"
+
+        # 签名主可执行文件
+        if [ -f "${PYTHON_BACKEND_DIR}/maccortex_backend" ]; then
+            codesign --force --sign "$DEVELOPER_ID" \
+                     --options runtime \
+                     --timestamp \
+                     --entitlements "$PYTHON_ENTITLEMENTS" \
+                     "${PYTHON_BACKEND_DIR}/maccortex_backend"
+            echo "  ✅ maccortex_backend 已签名"
+        fi
+    else
+        echo "  ⚠️  PythonBackend.entitlements 不存在，使用主 entitlements"
+        find "${PYTHON_BACKEND_DIR}" \( -name "*.so" -o -name "*.dylib" \) | while read lib; do
+            codesign --force --sign "$DEVELOPER_ID" \
+                     --options runtime \
+                     --timestamp \
+                     "$lib" 2>/dev/null || true
+        done
+        if [ -f "${PYTHON_BACKEND_DIR}/maccortex_backend" ]; then
+            codesign --force --sign "$DEVELOPER_ID" \
+                     --options runtime \
+                     --timestamp \
+                     --entitlements "$ENTITLEMENTS" \
+                     "${PYTHON_BACKEND_DIR}/maccortex_backend"
+        fi
+    fi
+else
+    echo "  ⚠️  无 Python 后端（跳过）"
+fi
+echo ""
+
 echo "步骤 1/3: 签名 XPC Services..."
 if [ -d "${APP_PATH}/Contents/XPCServices" ]; then
     shopt -s nullglob  # 如果没有匹配项，glob 返回空

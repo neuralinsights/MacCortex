@@ -87,6 +87,38 @@ else
 fi
 echo ""
 
+# 5.7. 构建并打包 Python 后端
+echo "🐍 步骤 5.7: 构建 Python 后端..."
+BACKEND_DIR="Backend"
+PYTHON_BUILD_DIR="${APP_BUNDLE}/Contents/Resources/python_backend"
+
+if command -v pyinstaller &> /dev/null; then
+    CURRENT_DIR=$(pwd)
+    cd "${BACKEND_DIR}"
+    pyinstaller maccortex_backend.spec \
+        --noconfirm \
+        --clean \
+        --distpath "../${BUILD_DIR}/python_dist" \
+        2>&1 | tail -5
+    cd "${CURRENT_DIR}"
+
+    # 复制到 App Bundle
+    if [ -d "${BUILD_DIR}/python_dist/maccortex_backend" ]; then
+        mkdir -p "${PYTHON_BUILD_DIR}"
+        cp -R "${BUILD_DIR}/python_dist/maccortex_backend/"* "${PYTHON_BUILD_DIR}/"
+        chmod +x "${PYTHON_BUILD_DIR}/maccortex_backend"
+        echo "✅ Python 后端已打包 ($(du -sh "${PYTHON_BUILD_DIR}" | cut -f1))"
+    else
+        echo "❌ 错误：PyInstaller 构建产物不存在"
+        exit 1
+    fi
+else
+    echo "⚠️  PyInstaller 未安装，跳过 Python 后端打包"
+    echo "   安装方法: pip install pyinstaller"
+    echo "   开发模式可设置 MACCORTEX_DEV_BACKEND 环境变量"
+fi
+echo ""
+
 # 6. 代码签名（开发签名）
 echo "🔐 步骤 6: 代码签名..."
 if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then

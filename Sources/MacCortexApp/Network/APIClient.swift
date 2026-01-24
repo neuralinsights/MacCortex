@@ -261,10 +261,27 @@ extension APIClient {
     func isBackendAvailable() async -> Bool {
         do {
             let response = try await healthCheck()
-            return response.status == "ok"
+            return response.status == "healthy" || response.status == "ok"
         } catch {
-            logger.error("Backend 连接失败: \(error.localizedDescription)")
             return false
         }
+    }
+
+    /// 等待 Backend 就绪（用于应用启动阶段）
+    /// - Parameter timeout: 最长等待时间（秒）
+    /// - Returns: true 如果 Backend 已就绪
+    func waitForBackend(timeout: TimeInterval = 30.0) async -> Bool {
+        let startTime = Date()
+        var delay: TimeInterval = 0.5
+
+        while Date().timeIntervalSince(startTime) < timeout {
+            if await isBackendAvailable() {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            delay = min(delay * 1.5, 3.0)
+        }
+
+        return false
     }
 }

@@ -234,11 +234,20 @@ public class PythonBridge {
     /// 后端 URL
     private let backendURL: URL
 
+    /// 后端端口
+    private let backendPort: Int = 8000
+
     /// 超时时间（秒）
     private let timeout: TimeInterval = 30.0
 
     /// 是否正在运行
     public private(set) var isRunning: Bool = false
+
+    /// 标准输出管道
+    private var outputPipe: Pipe?
+
+    /// 标准错误管道
+    private var errorPipe: Pipe?
 
     /// 设置运行状态（仅用于测试）
     /// - Parameter running: 运行状态
@@ -249,9 +258,7 @@ public class PythonBridge {
     // MARK: - Initialization
 
     private init() {
-        // TODO: 从配置文件读取或自动检测
-        // 默认使用本地 HTTP 服务（FastAPI）
-        self.backendURL = URL(string: "http://localhost:8000")!
+        self.backendURL = URL(string: "http://127.0.0.1:8000")!
     }
 
     // MARK: - Lifecycle
@@ -263,11 +270,64 @@ public class PythonBridge {
             return
         }
 
-        // TODO: 实现 Python 后端启动逻辑（Day 8-9）
-        // 1. 检测 Python 环境
-        // 2. 启动 FastAPI 服务
-        // 3. 等待服务就绪
-        // 4. 健康检查
+        // 1. 定位后端可执行文件
+        guard let backendPath = locateBackendExecutable() else {
+            throw PythonBridgeError.pythonNotFound
+        }
+
+        // 2. 配置并启动子进程
+        let process = Process()
+        process.executableURL = backendPath
+        process.currentDirectoryURL = backendPath.deletingLastPathComponent()
+
+        // 配置环境变量
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOST"] = "127.0.0.1"
+        environment["PORT"] = String(backendPort)
+        environment["RELOAD"] = "false"
+        environment["LOG_LEVEL"] = "INFO"
+        environment["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+        process.environment = environment
+
+        // 配置输出管道
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+        self.outputPipe = outPipe
+        self.errorPipe = errPipe
+
+        // 处理异常终止
+        process.terminationHandler = { [weak self] proc in
+            DispatchQueue.main.async {
+                self?.handleProcessTermination(exitCode: proc.terminationStatus)
+            }
+        }
+
+        // 3. 启动进程
+        do {
+            try process.run()
+        } catch {
+            throw PythonBridgeError.communicationFailed(
+                "Failed to launch backend: \(error.localizedDescription)"
+            )
+        }
+
+        self.backendProcess = process
+
+        // 4. 等待健康检查通过
+        let healthy = await waitForHealthy(
+            maxAttempts: 30,
+            initialDelay: 0.2,
+            maxDelay: 2.0,
+            totalTimeout: 30.0
+        )
+
+        guard healthy else {
+            process.terminate()
+            self.backendProcess = nil
+            throw PythonBridgeError.backendNotRunning
+        }
 
         isRunning = true
     }
@@ -278,10 +338,94 @@ public class PythonBridge {
             return
         }
 
-        // TODO: 实现 Python 后端停止逻辑（Day 8-9）
-        backendProcess?.terminate()
+        if let process = backendProcess, process.isRunning {
+            // 先发送 SIGINT 允许 uvicorn 优雅关闭
+            process.interrupt()
+
+            // 5 秒后强制终止
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) { [weak self] in
+                if let process = self?.backendProcess, process.isRunning {
+                    process.terminate()
+                }
+            }
+        }
+
         backendProcess = nil
+        outputPipe = nil
+        errorPipe = nil
         isRunning = false
+    }
+
+    // MARK: - Backend Location
+
+    /// 定位后端可执行文件
+    /// - Returns: 可执行文件 URL（如果找到）
+    private func locateBackendExecutable() -> URL? {
+        // 生产环境：App Bundle 内 Resources/python_backend/
+        if let resourceURL = Bundle.main.resourceURL {
+            let bundledPath = resourceURL
+                .appendingPathComponent("python_backend")
+                .appendingPathComponent("maccortex_backend")
+            if FileManager.default.isExecutableFile(atPath: bundledPath.path) {
+                return bundledPath
+            }
+        }
+
+        // 开发环境：通过环境变量指定
+        if let devPath = ProcessInfo.processInfo.environment["MACCORTEX_DEV_BACKEND"] {
+            let url = URL(fileURLWithPath: devPath)
+            if FileManager.default.isExecutableFile(atPath: url.path) {
+                return url
+            }
+        }
+
+        return nil
+    }
+
+    // MARK: - Health Check Waiting
+
+    /// 等待后端健康检查通过（指数退避）
+    private func waitForHealthy(
+        maxAttempts: Int,
+        initialDelay: TimeInterval,
+        maxDelay: TimeInterval,
+        totalTimeout: TimeInterval
+    ) async -> Bool {
+        let startTime = Date()
+        var delay = initialDelay
+
+        for _ in 1...maxAttempts {
+            // 检查总超时
+            if Date().timeIntervalSince(startTime) > totalTimeout {
+                return false
+            }
+
+            // 检查进程是否已退出
+            if let process = backendProcess, !process.isRunning {
+                return false
+            }
+
+            // 尝试健康检查
+            if await healthCheck() {
+                return true
+            }
+
+            // 指数退避等待
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            delay = min(delay * 1.5, maxDelay)
+        }
+
+        return false
+    }
+
+    // MARK: - Process Termination
+
+    /// 处理进程异常终止
+    private func handleProcessTermination(exitCode: Int32) {
+        isRunning = false
+        backendProcess = nil
+        outputPipe = nil
+        errorPipe = nil
     }
 
     /// 健康检查

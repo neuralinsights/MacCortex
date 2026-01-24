@@ -29,6 +29,7 @@ let package = Package(
             name: "MacCortexApp",
             dependencies: [
                 "PermissionsKit",
+                "PythonBridge",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/MacCortexApp",

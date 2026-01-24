@@ -63,7 +63,7 @@ class SwarmAPIClient: ObservableObject {
 
     /// 初始化 Swarm API 客户端
     /// - Parameter baseURL: Backend API 基础 URL（默认 http://localhost:8000）
-    init(baseURL: URL = URL(string: "http://localhost:8000")!) {
+    init(baseURL: URL = URL(string: "http://127.0.0.1:8000")!) {
         self.baseURL = baseURL
 
         // 配置 URLSession
@@ -220,7 +220,7 @@ class SwarmAPIClient: ObservableObject {
         disconnectWebSocket()
 
         // 构造 WebSocket URL
-        let wsURLString = "ws://localhost:8000/swarm/ws/\(taskId)"
+        let wsURLString = "ws://127.0.0.1:8000/swarm/ws/\(taskId)"
         guard let wsURL = URL(string: wsURLString) else {
             lastError = "Invalid WebSocket URL"
             return

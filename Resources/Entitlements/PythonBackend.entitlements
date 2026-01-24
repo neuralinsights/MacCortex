@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- JIT 编译支持（Python 运行时、MLX Metal 计算） -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- 无符号可执行内存（Python C 扩展、numpy、mlx） -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- 网络服务端（绑定 127.0.0.1:8000 提供 FastAPI 服务） -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+
+    <!-- 网络客户端（Ollama API、Hugging Face 下载、DuckDuckGo 搜索） -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- 禁用动态链接库验证（加载打包的 .so/.dylib 文件） -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+</dict>
+</plist>

@@ -19,6 +19,7 @@ import SwiftUI
 import Cocoa
 import Observation
 import PermissionsKit
+import PythonBridge
 import AppIntents
 
 @main
@@ -26,6 +27,15 @@ struct MacCortexApp: App {
     // Week 5: 测试版本 - 使用 AppKit 原生窗口
 
     init() {
+        // 启动 Python 后端
+        Task.detached(priority: .userInitiated) {
+            do {
+                try await PythonBridge.shared.start()
+            } catch {
+                print("[MacCortex] Python 后端启动失败: \(error.localizedDescription)")
+            }
+        }
+
         // 延迟显示 AppKit 测试窗口
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let windowController = TestWindowController()

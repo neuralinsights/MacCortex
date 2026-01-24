@@ -51,8 +51,8 @@ struct APIConfig {
             return url
         }
 
-        // 默认本地开发
-        return URL(string: "http://localhost:8000")!
+        // 默认本地后端（使用 127.0.0.1 避免 IPv6 解析问题）
+        return URL(string: "http://127.0.0.1:8000")!
     }
 
     /// 请求超时时间（秒）
