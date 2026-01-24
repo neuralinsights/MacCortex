@@ -13,6 +13,8 @@ block_cipher = None
 langchain_hiddenimports = collect_submodules('langchain')
 langchain_community_hiddenimports = collect_submodules('langchain_community')
 langgraph_hiddenimports = collect_submodules('langgraph')
+langgraph_checkpoint_sqlite_hiddenimports = collect_submodules('langgraph.checkpoint.sqlite')
+langchain_anthropic_hiddenimports = collect_submodules('langchain_anthropic')
 
 # 核心隐藏导入
 hiddenimports = [
@@ -134,6 +136,18 @@ hiddenimports = [
 hiddenimports += langchain_hiddenimports
 hiddenimports += langchain_community_hiddenimports
 hiddenimports += langgraph_hiddenimports
+hiddenimports += langgraph_checkpoint_sqlite_hiddenimports
+hiddenimports += langchain_anthropic_hiddenimports
+
+# 额外依赖
+hiddenimports += [
+    'aiosqlite', 'sqlite_vec',
+    'langchain_community',
+    'anthropic',
+    'mlx', 'mlx.core', 'mlx.nn', 'mlx_lm', 'mlx_lm.utils',
+    'dotenv', 'python_dotenv',
+    'httpx_sse',
+]
 
 # 去重
 hiddenimports = list(set(hiddenimports))

@@ -36,6 +36,8 @@ echo ""
 echo "🔧 步骤 3: 复制可执行文件..."
 cp "${EXECUTABLE}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
+# 添加 @loader_path/../Frameworks 到 rpath（Sparkle.framework 需要）
+install_name_tool -add_rpath "@loader_path/../Frameworks" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}" 2>/dev/null || true
 echo "✅ 可执行文件已复制"
 echo ""
 
@@ -92,10 +94,21 @@ echo "🐍 步骤 5.7: 构建 Python 后端..."
 BACKEND_DIR="Backend"
 PYTHON_BUILD_DIR="${APP_BUNDLE}/Contents/Resources/python_backend"
 
-if command -v pyinstaller &> /dev/null; then
+PYINSTALLER_CMD=""
+if [ -f "${BACKEND_DIR}/.venv/bin/pyinstaller" ]; then
+    PYINSTALLER_CMD="${BACKEND_DIR}/.venv/bin/pyinstaller"
+elif command -v pyinstaller &> /dev/null; then
+    PYINSTALLER_CMD="pyinstaller"
+fi
+
+if [ -n "${PYINSTALLER_CMD}" ]; then
     CURRENT_DIR=$(pwd)
     cd "${BACKEND_DIR}"
-    pyinstaller maccortex_backend.spec \
+    # 激活 venv 确保所有依赖可用
+    if [ -f ".venv/bin/activate" ]; then
+        source .venv/bin/activate
+    fi
+    "${PYINSTALLER_CMD}" maccortex_backend.spec \
         --noconfirm \
         --clean \
         --distpath "../${BUILD_DIR}/python_dist" \

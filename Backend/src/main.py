@@ -788,13 +788,24 @@ async def global_exception_handler(request, exc):
 
 def main():
     """启动服务"""
-    uvicorn.run(
-        "main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.reload,
-        log_level=settings.log_level.lower(),
-    )
+    # PyInstaller 环境中不能用字符串模块引用，需直接传 app 对象
+    is_frozen = getattr(sys, 'frozen', False)
+    if is_frozen:
+        uvicorn.run(
+            app,
+            host=settings.host,
+            port=settings.port,
+            reload=False,
+            log_level=settings.log_level.lower(),
+        )
+    else:
+        uvicorn.run(
+            "main:app",
+            host=settings.host,
+            port=settings.port,
+            reload=settings.reload,
+            log_level=settings.log_level.lower(),
+        )
 
 
 if __name__ == "__main__":
