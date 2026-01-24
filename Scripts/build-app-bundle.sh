@@ -96,7 +96,7 @@ PYTHON_BUILD_DIR="${APP_BUNDLE}/Contents/Resources/python_backend"
 
 PYINSTALLER_CMD=""
 if [ -f "${BACKEND_DIR}/.venv/bin/pyinstaller" ]; then
-    PYINSTALLER_CMD="${BACKEND_DIR}/.venv/bin/pyinstaller"
+    PYINSTALLER_CMD="$(cd "${BACKEND_DIR}" && pwd)/.venv/bin/pyinstaller"
 elif command -v pyinstaller &> /dev/null; then
     PYINSTALLER_CMD="pyinstaller"
 fi
