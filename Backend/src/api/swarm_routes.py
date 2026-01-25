@@ -13,6 +13,7 @@ Routes:
 
 import asyncio
 import json
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -473,18 +474,32 @@ async def _execute_task(task_id: str):
             tool_runner={"require_approval": task["enable_hitl"]}
         )
 
-        # 初始化状态
+        # 初始化状态 - 必须与 SwarmState TypedDict 完全匹配
         initial_state: SwarmState = {
+            # 输入
             "user_input": task["user_input"],
-            "subtasks": [],
+            "context": task.get("context", {}),
+
+            # 计划
+            "plan": None,  # Planner 会填充
             "current_subtask_index": 0,
+
+            # 执行
             "subtask_results": [],
-            "code_artifacts": [],
-            "current_iteration": 0,
-            "max_iterations": 3,
-            "status": "executing",
-            "error_message": None,
-            "reflection": None
+            "current_code": None,
+            "current_code_file": None,
+            "review_feedback": None,
+
+            # 控制
+            "iteration_count": 0,
+            "total_tokens": 0,
+            "start_time": time.time(),
+            "status": "planning",  # 从 planning 开始，不是 executing
+            "user_interrupted": False,
+
+            # 输出
+            "final_output": None,
+            "error_message": None
         }
 
         thread_config = {"configurable": {"thread_id": task_id}}
