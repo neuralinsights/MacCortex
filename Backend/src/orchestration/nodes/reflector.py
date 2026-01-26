@@ -33,7 +33,8 @@ class ReflectorNode:
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.3,
         llm: Optional[Any] = None,  # 可选的 LLM 实例（用于测试）
-        fallback_to_local: bool = True
+        fallback_to_local: bool = True,
+        using_local_model: Optional[bool] = None
     ):
         """
         初始化 Reflector 节点
@@ -44,11 +45,12 @@ class ReflectorNode:
             temperature: LLM 温度（0.3 适合反思任务）
             llm: 可选的 LLM 实例（用于测试时注入 mock）
             fallback_to_local: 当 API Key 缺失时是否降级到本地模型
+            using_local_model: 显式指定是否使用本地模型（当注入 llm 时使用）
         """
         # 使用提供的 LLM 或创建新的
         if llm is not None:
             self.llm = llm
-            self.using_local_model = False
+            self.using_local_model = using_local_model if using_local_model is not None else False
         else:
             # Anthropic API Key
             api_key = os.getenv("ANTHROPIC_API_KEY")

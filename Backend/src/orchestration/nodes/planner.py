@@ -33,7 +33,8 @@ class PlannerNode:
         max_subtasks: int = 10,
         min_subtasks: int = 3,
         llm: Optional[Any] = None,
-        fallback_to_local: bool = True
+        fallback_to_local: bool = True,
+        using_local_model: Optional[bool] = None
     ):
         """
         初始化 Planner Node
@@ -45,11 +46,13 @@ class PlannerNode:
             min_subtasks: 最小子任务数量
             llm: 可选的 LLM 实例（用于测试时依赖注入）
             fallback_to_local: 当 API Key 缺失时是否降级到本地模型
+            using_local_model: 显式指定是否使用本地模型（当注入 llm 时使用）
         """
         # 使用注入的 LLM 或创建新的 LLM
         if llm is not None:
             self.llm = llm
-            self.using_local_model = False
+            # 使用显式传递的标志，或默认为 False
+            self.using_local_model = using_local_model if using_local_model is not None else False
         else:
             # 检查 API Key
             api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -181,13 +184,20 @@ class PlannerNode:
         # 调用 LLM
         print(f"[Planner] 开始拆解任务: {user_task}")
         print(f"[Planner] max_tokens={max_output_tokens} (复杂度: {task_complexity_for_max_tokens})")
-        response = await self.llm.ainvoke(
-            [
-                SystemMessage(content=self.system_prompt),
-                HumanMessage(content=user_prompt)
-            ],
-            max_tokens=max_output_tokens
-        )
+
+        # 根据模型类型选择调用方式
+        messages = [
+            SystemMessage(content=self.system_prompt),
+            HumanMessage(content=user_prompt)
+        ]
+
+        if self.using_local_model:
+            # Ollama 模型：不使用 bind() 动态设置 num_predict（langchain-ollama 1.0.1 兼容性问题）
+            # 改为直接调用，让模型自己控制输出长度
+            response = await self.llm.ainvoke(messages)
+        else:
+            # Anthropic 模型：直接传递 max_tokens
+            response = await self.llm.ainvoke(messages, max_tokens=max_output_tokens)
 
         # 解析 LLM 输出
         try:
@@ -442,6 +452,8 @@ def create_planner_node(
             temperature=kwargs.get("temperature", 0.2)
         )
         kwargs["llm"] = llm
+        # 检测是否使用本地模型（通过模型名称前缀判断）
+        kwargs["using_local_model"] = model_name.startswith("ollama/")
         print(f"[Planner] 使用模型: {model_name}")
 
     planner = PlannerNode(**kwargs)

@@ -32,7 +32,8 @@ class CoderNode:
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.3,
         llm: Optional[Any] = None,
-        fallback_to_local: bool = True
+        fallback_to_local: bool = True,
+        using_local_model: Optional[bool] = None
     ):
         """
         初始化 Coder Node
@@ -43,11 +44,12 @@ class CoderNode:
             temperature: 温度参数（0.3 为代码生成推荐值）
             llm: 可选的 LLM 实例（用于测试时依赖注入）
             fallback_to_local: 当 API Key 缺失时是否降级到本地模型
+            using_local_model: 显式指定是否使用本地模型（当注入 llm 时使用）
         """
         # 使用注入的 LLM 或创建新的 LLM
         if llm is not None:
             self.llm = llm
-            self.using_local_model = False
+            self.using_local_model = using_local_model if using_local_model is not None else False
         else:
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
@@ -170,13 +172,19 @@ if __name__ == "__main__":
 
         # 调用 LLM 生成代码
         print(f"[Coder] max_tokens={max_output_tokens} (描述长度: {desc_len})")
-        response = await self.llm.ainvoke(
-            [
-                SystemMessage(content=self.system_prompt),
-                HumanMessage(content=user_prompt)
-            ],
-            max_tokens=max_output_tokens
-        )
+
+        messages = [
+            SystemMessage(content=self.system_prompt),
+            HumanMessage(content=user_prompt)
+        ]
+
+        if self.using_local_model:
+            # Ollama 模型：不使用 bind() 动态设置 num_predict（langchain-ollama 1.0.1 兼容性问题）
+            # 改为直接调用，让模型自己控制输出长度
+            response = await self.llm.ainvoke(messages)
+        else:
+            # Anthropic 模型：直接传递 max_tokens
+            response = await self.llm.ainvoke(messages, max_tokens=max_output_tokens)
 
         # 提取代码
         code, language = self._extract_code(response.content)
@@ -325,6 +333,8 @@ def create_coder_node(
             temperature=kwargs.get("temperature", 0.3)
         )
         kwargs["llm"] = llm
+        # 检测是否使用本地模型（通过模型名称前缀判断）
+        kwargs["using_local_model"] = model_name.startswith("ollama/")
         print(f"[Coder] 使用模型: {model_name}")
 
     coder = CoderNode(workspace_path, **kwargs)
