@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from threading import Lock
+from threading import RLock
 from typing import Optional
 
 from .models import CostInfo, ProviderType, TokenUsage
@@ -88,7 +88,7 @@ class UsageTracker:
             max_records: 最大记录数量（超出时删除旧记录）
         """
         self._records: list[UsageRecord] = []
-        self._lock = Lock()
+        self._lock = RLock()  # 使用可重入锁，支持嵌套调用（如 export_to_json -> get_stats）
         self._max_records = max_records
 
         # 累计统计（避免遍历所有记录）
