@@ -42,10 +42,47 @@ class SwarmAPIClient: ObservableObject {
     /// WebSocket Task
     private var webSocketTask: URLSessionWebSocketTask?
 
-    /// JSON Decoder（配置 ISO8601 日期解析）
+    /// JSON Decoder（配置 ISO8601 日期解析，支持微秒）
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        // 创建支持微秒的 ISO8601 日期格式化器
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            // 尝试带微秒的格式
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+
+            // 尝试不带微秒的标准 ISO8601 格式
+            let standardFormatter = ISO8601DateFormatter()
+            standardFormatter.formatOptions = [.withInternetDateTime]
+            if let date = standardFormatter.date(from: dateString) {
+                return date
+            }
+
+            // 尝试不带时区的格式（后端可能返回此格式）
+            let localFormatter = DateFormatter()
+            localFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+            localFormatter.locale = Locale(identifier: "en_US_POSIX")
+            if let date = localFormatter.date(from: dateString) {
+                return date
+            }
+
+            // 不带微秒的本地格式
+            localFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            if let date = localFormatter.date(from: dateString) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot decode date string: \(dateString)"
+            )
+        }
         return decoder
     }()
 
@@ -88,7 +125,7 @@ class SwarmAPIClient: ObservableObject {
         enableHITL: Bool = true,
         enableCodeReview: Bool = false
     ) async throws -> String {
-        let url = baseURL.appendingPathComponent("/swarm/tasks")
+        let url = baseURL.appendingPathComponent("swarm/tasks")
 
         let requestBody = CreateTaskRequest(
             userInput: userInput,
@@ -122,7 +159,7 @@ class SwarmAPIClient: ObservableObject {
     /// - Parameter taskId: 任务 ID
     /// - Returns: 任务详情
     func fetchTaskStatus(taskId: String) async throws -> SwarmTask {
-        let url = baseURL.appendingPathComponent("/swarm/tasks/\(taskId)")
+        let url = baseURL.appendingPathComponent("swarm/tasks/\(taskId)")
 
         let (data, response) = try await session.data(from: url)
 
@@ -154,7 +191,7 @@ class SwarmAPIClient: ObservableObject {
         action: ApprovalAction,
         modifiedData: [String: Any]? = nil
     ) async throws {
-        let url = baseURL.appendingPathComponent("/swarm/tasks/\(taskId)/approve")
+        let url = baseURL.appendingPathComponent("swarm/tasks/\(taskId)/approve")
 
         let approval = HITLApprovalRequest(
             interruptId: interruptId,
@@ -189,7 +226,7 @@ class SwarmAPIClient: ObservableObject {
         limit: Int = 20,
         offset: Int = 0
     ) async throws -> TaskHistoryResponse {
-        var components = URLComponents(url: baseURL.appendingPathComponent("/swarm/tasks"), resolvingAgainstBaseURL: true)!
+        var components = URLComponents(url: baseURL.appendingPathComponent("swarm/tasks"), resolvingAgainstBaseURL: true)!
         components.queryItems = [
             URLQueryItem(name: "status", value: status),
             URLQueryItem(name: "limit", value: "\(limit)"),
@@ -267,6 +304,17 @@ class SwarmAPIClient: ObservableObject {
             await receiveMessages()
 
         } catch {
+            // 忽略正常断开连接导致的错误（如用户返回主界面）
+            let errorDesc = error.localizedDescription.lowercased()
+            if errorDesc.contains("socket is not connected") ||
+               errorDesc.contains("cancelled") ||
+               errorDesc.contains("connection was closed") {
+                // 正常断开，不显示错误
+                connectionStatus = .disconnected
+                return
+            }
+
+            // 其他错误才显示
             connectionStatus = .error(error.localizedDescription)
             lastError = error.localizedDescription
         }
@@ -334,6 +382,10 @@ class SwarmAPIClient: ObservableObject {
                         output: task.output
                     )
                 }
+
+            case .intermediateStep:
+                // 中间处理步骤（如 stop_condition 检查）- 忽略，不更新主进度
+                break
 
             case .hitlInterrupt:
                 // 显示 HITL 审批 UI

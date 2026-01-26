@@ -6,11 +6,174 @@ Planner Agent 负责将复杂的用户任务拆解为可执行的子任务列表
 
 import json
 import os
-from typing import Dict, Any, List, Optional
+import re
+from typing import Dict, Any, List, Optional, Tuple
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from ..state import SwarmState, Plan, Subtask
+
+
+def _cn_to_number(cn_str: str) -> Optional[int]:
+    """
+    将中文数字转换为阿拉伯数字
+
+    支持：零一二三四五六七八九十百
+    例如：十五 -> 15, 二十三 -> 23, 一百二十 -> 120
+    """
+    cn_nums = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
+               "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+
+    if not cn_str:
+        return None
+
+    # 如果已经是阿拉伯数字，直接返回
+    if cn_str.isdigit():
+        return int(cn_str)
+
+    result = 0
+    temp = 0
+
+    i = 0
+    while i < len(cn_str):
+        char = cn_str[i]
+
+        if char in cn_nums:
+            temp = cn_nums[char]
+        elif char == "十":
+            if temp == 0:
+                temp = 1  # "十" 开头表示 10
+            result += temp * 10
+            temp = 0
+        elif char == "百":
+            if temp == 0:
+                temp = 1
+            result += temp * 100
+            temp = 0
+        else:
+            return None  # 无法识别的字符
+
+        i += 1
+
+    result += temp
+    return result if result > 0 else None
+
+
+def _try_quick_math(task: str) -> Optional[Tuple[str, Any]]:
+    """
+    检测并快速执行简单数学计算
+
+    支持的格式：
+    - "1+1" / "1加1" / "一加一" / "计算1+1"
+    - "2*3" / "2乘3" / "二乘三"
+    - "10/2" / "10除以2" / "十除以二"
+    - "5-3" / "5减3" / "五减三"
+    - "十五乘以十五" -> 15 * 15 = 225
+
+    Returns:
+        Optional[Tuple[str, Any]]: (表达式描述, 计算结果) 或 None
+    """
+    # 清理任务文本
+    task_clean = task.strip().lower()
+
+    # 移除常见前缀
+    prefixes = ["计算", "算一下", "求", "告诉我", "请问", "帮我算"]
+    for prefix in prefixes:
+        if task_clean.startswith(prefix):
+            task_clean = task_clean[len(prefix):].strip()
+
+    # 移除"等于多少"等后缀（先处理，避免干扰）
+    task_clean = re.sub(r"等于(多少|几|什么)?[？?]?$", "", task_clean).strip()
+    task_clean = re.sub(r"是(多少|几)?[？?]?$", "", task_clean).strip()
+
+    # 中文运算符（按长度降序）
+    cn_ops = [("乘以", "*"), ("除以", "/"), ("加", "+"), ("减", "-"), ("乘", "*"), ("除", "/")]
+
+    # 查找运算符并分割
+    operator = None
+    op_symbol = None
+    parts = None
+
+    for cn_op, symbol in cn_ops:
+        if cn_op in task_clean:
+            parts = task_clean.split(cn_op)
+            if len(parts) == 2:
+                operator = cn_op
+                op_symbol = symbol
+                break
+
+    # 如果没找到中文运算符，尝试阿拉伯运算符
+    if not parts:
+        for symbol in ["+", "-", "*", "/", "×", "÷"]:
+            if symbol in task_clean:
+                parts = task_clean.split(symbol)
+                if len(parts) == 2:
+                    op_symbol = symbol.replace("×", "*").replace("÷", "/")
+                    break
+
+    if not parts or len(parts) != 2:
+        # 尝试直接作为纯数学表达式解析
+        math_pattern = r"^[\d\s\+\-\*\/\.\(\)]+$"
+        if re.match(math_pattern, task_clean):
+            allowed_chars = set("0123456789+-*/.()")
+            if all(c in allowed_chars or c.isspace() for c in task_clean):
+                try:
+                    result = eval(task_clean)
+                    if isinstance(result, float) and result.is_integer():
+                        result = int(result)
+                    return (task_clean.replace(" ", ""), result)
+                except:
+                    pass
+        return None
+
+    # 解析两边的数字
+    left_str = parts[0].strip()
+    right_str = parts[1].strip()
+
+    # 转换中文数字
+    left_num = _cn_to_number(left_str)
+    right_num = _cn_to_number(right_str)
+
+    if left_num is None or right_num is None:
+        return None
+
+    # 计算结果
+    expr = f"{left_num}{op_symbol}{right_num}"
+    try:
+        result = eval(expr)
+        if isinstance(result, float) and result.is_integer():
+            result = int(result)
+        return (expr, result)
+    except:
+        return None
+
+    # 移除"等于多少"、"等于几"等后缀
+    task_clean = re.sub(r"等于(多少|几|什么)?[？?]?$", "", task_clean).strip()
+    task_clean = re.sub(r"是(多少|几)?[？?]?$", "", task_clean).strip()
+
+    # 检查是否是简单数学表达式 (仅支持基本四则运算)
+    # 格式: 数字 运算符 数字 [运算符 数字 ...]
+    math_pattern = r"^[\d\s\+\-\*\/\.\(\)]+$"
+    if not re.match(math_pattern, task_clean):
+        return None
+
+    # 安全性检查：只允许数字和基本运算符
+    allowed_chars = set("0123456789+-*/.()")
+    if not all(c in allowed_chars or c.isspace() for c in task_clean):
+        return None
+
+    # 尝试计算
+    try:
+        # 使用 eval（已经过安全检查）
+        result = eval(task_clean)
+
+        # 格式化结果
+        if isinstance(result, float) and result.is_integer():
+            result = int(result)
+
+        return (task_clean.replace(" ", ""), result)
+    except:
+        return None
 
 
 class PlannerNode:
@@ -168,6 +331,26 @@ class PlannerNode:
         """
         user_task = state["user_input"]
         context = state.get("context", {})
+
+        # 🚀 快速路径：检测简单数学计算
+        quick_result = _try_quick_math(user_task)
+        if quick_result:
+            expr, result = quick_result
+            print(f"[Planner] ⚡ 快速数学计算: {expr} = {result}")
+
+            # 直接返回结果，跳过整个 Swarm 流程
+            state["status"] = "completed"
+            state["plan"] = {
+                "subtasks": [],
+                "overall_acceptance": [f"{expr} = {result}"]
+            }
+            state["final_output"] = {
+                "passed": True,
+                "summary": f"计算结果: {expr} = {result}",
+                "achievements": [f"成功计算 {expr} = {result}"],
+                "issues": []
+            }
+            return state
 
         # 构建用户提示
         user_prompt = self._build_user_prompt(user_task, context)

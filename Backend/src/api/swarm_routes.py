@@ -560,15 +560,28 @@ async def _execute_task(task_id: str):
                         agents_status[node_name] = "completed"
                         task_manager.update_task(task_id, {"agents_status": agents_status})
 
-        # 任务完成
+                    # 提取 final_output（来自 reflector 或最后一个节点）
+                    if isinstance(node_output, dict) and "final_output" in node_output:
+                        final_output = node_output.get("final_output")
+                        if final_output:
+                            task_manager.update_task(task_id, {"output": final_output})
+
+        # 任务完成 - 获取最终状态以提取输出
+        final_state = await graph.aget_state(thread_config)
+        final_output = None
+        if final_state and final_state.values:
+            final_output = final_state.values.get("final_output")
+
         task_manager.update_task(task_id, {
             "status": "completed",
-            "progress": 1.0
+            "progress": 1.0,
+            "output": final_output
         })
 
         await task_manager.broadcast_to_websockets(task_id, {
             "type": "task_completed",
             "status": "success",
+            "output": final_output,
             "timestamp": datetime.now().isoformat()
         })
 

@@ -16,32 +16,37 @@ struct ExportOptionsView: View {
     let onExport: (ExportOptions) -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             // 标题
             headerView
 
             Divider()
 
-            // 导出格式
-            formatSection
+            // 可滚动内容区域
+            ScrollView {
+                VStack(spacing: 16) {
+                    // 导出格式
+                    formatSection
+
+                    Divider()
+
+                    // 布局选项
+                    layoutSection
+
+                    Divider()
+
+                    // 其他选项
+                    optionsSection
+                }
+            }
 
             Divider()
 
-            // 布局选项
-            layoutSection
-
-            Divider()
-
-            // 其他选项
-            optionsSection
-
-            Spacer()
-
-            // 操作按钮
+            // 操作按钮（固定在底部）
             actionButtons
         }
         .padding(24)
-        .frame(width: 500, height: 550)
+        .frame(width: 500, height: 620)
     }
 
     // MARK: - Header

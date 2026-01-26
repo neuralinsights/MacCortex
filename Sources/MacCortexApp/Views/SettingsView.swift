@@ -21,36 +21,51 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        TabView {
-            // Tab 1: 通用设置
-            GeneralSettingsView()
-                .tabItem {
-                    Label("通用", systemImage: "gear")
-                }
-                .tag(0)
+        VStack(spacing: 0) {
+            TabView {
+                // Tab 1: 通用设置
+                GeneralSettingsView()
+                    .tabItem {
+                        Label("通用", systemImage: "gear")
+                    }
+                    .tag(0)
 
-            // Tab 2: 剪贴板设置
-            ClipboardSettingsView()
-                .tabItem {
-                    Label("剪贴板", systemImage: "doc.on.clipboard")
-                }
-                .tag(1)
+                // Tab 2: 剪贴板设置
+                ClipboardSettingsView()
+                    .tabItem {
+                        Label("剪贴板", systemImage: "doc.on.clipboard")
+                    }
+                    .tag(1)
 
-            // Tab 3: 快捷键设置
-            ShortcutsSettingsView()
-                .tabItem {
-                    Label("快捷键", systemImage: "command")
-                }
-                .tag(2)
+                // Tab 3: 快捷键设置
+                ShortcutsSettingsView()
+                    .tabItem {
+                        Label("快捷键", systemImage: "command")
+                    }
+                    .tag(2)
 
-            // Tab 4: 高级设置
-            AdvancedSettingsView()
-                .tabItem {
-                    Label("高级", systemImage: "slider.horizontal.3")
+                // Tab 4: 高级设置
+                AdvancedSettingsView()
+                    .tabItem {
+                        Label("高级", systemImage: "slider.horizontal.3")
+                    }
+                    .tag(3)
+            }
+
+            Divider()
+
+            // 底部按钮区域
+            HStack {
+                Spacer()
+
+                Button("关闭") {
+                    dismiss()
                 }
-                .tag(3)
+                .keyboardShortcut(.escape, modifiers: [])
+            }
+            .padding()
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 450)
     }
 }
 

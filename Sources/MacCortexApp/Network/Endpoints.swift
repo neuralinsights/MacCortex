@@ -55,8 +55,8 @@ struct APIConfig {
         return URL(string: "http://127.0.0.1:8000")!
     }
 
-    /// 请求超时时间（秒）
-    static let timeout: TimeInterval = 30.0
+    /// 请求超时时间（秒）- 大文档翻译需要更长时间
+    static let timeout: TimeInterval = 180.0
 
     /// 最大重试次数
     static let maxRetries: Int = 3

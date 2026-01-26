@@ -228,6 +228,13 @@ class SwarmViewModel: ObservableObject {
         showError = false
     }
 
+    /// 清除当前任务（返回任务输入界面）
+    func clearCurrentTask() {
+        apiClient.currentTask = nil
+        apiClient.activeInterrupt = nil
+        apiClient.disconnectWebSocket()
+    }
+
     // MARK: - Computed Properties
 
     /// 是否可以提交任务

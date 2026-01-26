@@ -23,8 +23,9 @@ class BackendClient: ObservableObject {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 300
+        // 批量翻译可能需要处理大文档，增加超时时间
+        config.timeoutIntervalForRequest = 180  // 3分钟请求超时
+        config.timeoutIntervalForResource = 600  // 10分钟资源超时
         self.session = URLSession(configuration: config)
     }
 

@@ -282,14 +282,20 @@ struct BatchTranslationView: View {
 
     /// 执行导出
     private func performExport(with options: ExportOptions) {
-        let savePanel = NSSavePanel()
-        savePanel.allowedContentTypes = [contentTypeForFormat(options.format)]
-        savePanel.nameFieldStringValue = defaultFilename(for: options.format)
-        savePanel.title = "导出翻译结果"
-        savePanel.message = "选择导出位置"
-        savePanel.canCreateDirectories = true
+        // 延迟执行，确保 sheet 已完全关闭
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            let savePanel = NSSavePanel()
+            savePanel.allowedContentTypes = [contentTypeForFormat(options.format)]
+            savePanel.nameFieldStringValue = defaultFilename(for: options.format)
+            savePanel.title = "导出翻译结果"
+            savePanel.message = "选择保存位置"
+            savePanel.canCreateDirectories = true
+            savePanel.isExtensionHidden = false
+            savePanel.showsTagField = false
 
-        savePanel.begin { response in
+            // 使用同步模式显示 save panel，确保用户能看到
+            let response = savePanel.runModal()
+
             guard response == .OK, let url = savePanel.url else {
                 print("[BatchTranslation] 导出已取消")
                 return
@@ -303,7 +309,7 @@ struct BatchTranslationView: View {
                 )
                 print("[BatchTranslation] 导出成功: \(url.path)")
 
-                // 显示成功通知（可选）
+                // 显示成功通知
                 showExportSuccessNotification(url: url)
             } catch {
                 print("[BatchTranslation] 导出失败: \(error)")

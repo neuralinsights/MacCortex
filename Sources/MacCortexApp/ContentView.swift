@@ -18,20 +18,6 @@
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        ZStack {
-            Color.red  // 纯红色背景，最明显
-
-            Text("MacCortex 测试")
-                .font(.system(size: 72, weight: .black))
-                .foregroundColor(.white)
-        }
-        .ignoresSafeArea()
-    }
-}
-
-// 备份原版本（暂时不用）
-struct ContentView_Original: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
@@ -40,7 +26,7 @@ struct ContentView_Original: View {
                 // Phase 0.5 Day 8: 首次启动引导
                 FirstRunView()
             } else {
-                // 主界面（Phase 2 开发）
+                // 主界面
                 MainView()
             }
         }

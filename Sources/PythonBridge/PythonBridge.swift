@@ -431,7 +431,7 @@ public class PythonBridge {
     /// 健康检查
     /// - Returns: 后端是否健康
     public func healthCheck() async -> Bool {
-        let healthURL = backendURL.appendingPathComponent("/health")
+        let healthURL = backendURL.appendingPathComponent("health")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: healthURL)
@@ -444,7 +444,7 @@ public class PythonBridge {
             // 尝试解码响应以验证格式
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let status = json["status"] as? String,
-               status == "healthy" {
+               status == "healthy" || status == "ok" {
                 return true
             }
 
@@ -466,7 +466,7 @@ public class PythonBridge {
         }
 
         // 构建请求 URL
-        let executeURL = backendURL.appendingPathComponent("/execute")
+        let executeURL = backendURL.appendingPathComponent("execute")
 
         // 创建 HTTP 请求
         var urlRequest = URLRequest(url: executeURL)
@@ -540,7 +540,7 @@ public class PythonBridge {
     /// 获取后端版本信息
     /// - Returns: 版本信息字典
     public func getVersion() async throws -> [String: String] {
-        let versionURL = backendURL.appendingPathComponent("/version")
+        let versionURL = backendURL.appendingPathComponent("version")
 
         do {
             let (data, response) = try await URLSession.shared.data(from: versionURL)

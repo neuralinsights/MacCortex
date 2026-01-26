@@ -187,11 +187,23 @@ class AuditLogger:
             text_length: 记录的文本最大长度（0 = 不限制）
             enable_pii_redaction: 是否启用 PII 脱敏
         """
-        # 设置日志目录
+        # 设置日志目录（优先使用用户可写目录，避免只读文件系统问题）
         if log_dir is None:
-            log_dir = os.getenv("AUDIT_LOG_DIR", "logs/audit")
+            log_dir = os.getenv("AUDIT_LOG_DIR")
+            if not log_dir:
+                # 使用 macOS 标准日志目录
+                home = os.path.expanduser("~")
+                log_dir = os.path.join(home, "Library", "Logs", "MacCortex", "audit")
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            # 如果无法创建目录（如只读文件系统），使用临时目录
+            import tempfile
+            fallback_dir = os.path.join(tempfile.gettempdir(), "MacCortex", "audit")
+            logger.warning(f"无法创建日志目录 {log_dir}: {e}, 回退到 {fallback_dir}")
+            self.log_dir = Path(fallback_dir)
+            self.log_dir.mkdir(parents=True, exist_ok=True)
 
         # 配置参数
         self.text_length = int(os.getenv("AUDIT_LOG_TEXT_LENGTH", str(text_length)))

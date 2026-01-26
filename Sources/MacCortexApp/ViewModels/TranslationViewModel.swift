@@ -478,10 +478,3 @@ class TranslationViewModel: ObservableObject {
     }
 }
 
-// MARK: - Helper Extensions
-
-extension JSONDecoder {
-    func decode<T>(_ type: T.Type, from data: Data) throws -> T where T: Decodable {
-        return try self.decode(type, from: data)
-    }
-}

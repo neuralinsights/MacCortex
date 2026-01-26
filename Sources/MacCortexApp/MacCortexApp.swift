@@ -24,7 +24,7 @@ import AppIntents
 
 @main
 struct MacCortexApp: App {
-    // Week 5: 测试版本 - 使用 AppKit 原生窗口
+    @State private var appState = AppState()
 
     init() {
         // 启动 Python 后端
@@ -35,19 +35,13 @@ struct MacCortexApp: App {
                 print("[MacCortex] Python 后端启动失败: \(error.localizedDescription)")
             }
         }
-
-        // 延迟显示 AppKit 测试窗口
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            let windowController = TestWindowController()
-            windowController.showWindow(nil)
-            windowController.window?.makeKeyAndOrderFront(nil)
-        }
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .frame(width: 800, height: 600)
+                .environment(appState)
+                .frame(minWidth: 900, minHeight: 650)
         }
     }
 }

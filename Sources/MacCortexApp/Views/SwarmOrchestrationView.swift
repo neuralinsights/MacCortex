@@ -113,20 +113,53 @@ struct SwarmOrchestrationView: View {
     private var mainContentView: some View {
         if let currentTask = viewModel.apiClient.currentTask {
             // 有活跃任务：显示工作流可视化
-            ScrollView {
-                VStack(spacing: 24) {
-                    // 任务信息卡片
-                    TaskInfoCard(task: currentTask)
+            VStack(spacing: 0) {
+                // 顶部工具栏：返回按钮
+                HStack {
+                    Button {
+                        viewModel.clearCurrentTask()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("新建任务")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
 
-                    // 工作流可视化
-                    WorkflowVisualizationSection(task: currentTask)
+                    Spacer()
 
-                    // 连接状态
-                    ConnectionStatusBanner(
-                        status: viewModel.apiClient.connectionStatus
-                    )
+                    // 任务状态指示
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(currentTask.status.color)
+                            .frame(width: 8, height: 8)
+                        Text(currentTask.status.displayName)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding()
+                .background(Color(NSColor.windowBackgroundColor))
+
+                Divider()
+
+                // 任务详情滚动区域
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // 任务信息卡片
+                        TaskInfoCard(task: currentTask)
+
+                        // 工作流可视化
+                        WorkflowVisualizationSection(task: currentTask)
+
+                        // 连接状态
+                        ConnectionStatusBanner(
+                            status: viewModel.apiClient.connectionStatus
+                        )
+                    }
+                    .padding()
+                }
             }
         } else {
             // 无活跃任务：显示任务输入
@@ -297,7 +330,7 @@ struct TaskInfoCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(task.userInput)
+                    Text(task.userInput ?? "未知任务")
                         .font(.headline)
 
                     Text("任务 ID: \(task.id)")
@@ -338,6 +371,92 @@ struct TaskInfoCard: View {
                 Text("耗时: \(task.formattedDuration)")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+
+            // 显示任务输出（仅当任务完成或失败时）
+            if (task.status == .completed || task.status == .failed), let output = task.output {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    // 结果标题
+                    HStack {
+                        if output.passed == true {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("任务完成")
+                                .font(.headline)
+                        } else {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text("任务失败")
+                                .font(.headline)
+                        }
+                    }
+
+                    // 摘要
+                    if let summary = output.summary {
+                        Text(summary)
+                            .font(.body)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(NSColor.textBackgroundColor))
+                            .cornerRadius(8)
+                            .textSelection(.enabled)
+                    }
+
+                    // 成就列表
+                    if let achievements = output.achievements, !achievements.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("完成项:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            ForEach(achievements, id: \.self) { item in
+                                HStack(alignment: .top) {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.green)
+                                        .font(.caption)
+                                    Text(item)
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                    }
+
+                    // 问题列表
+                    if let issues = output.issues, !issues.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("问题:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            ForEach(issues, id: \.self) { issue in
+                                HStack(alignment: .top) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.orange)
+                                        .font(.caption)
+                                    Text(issue)
+                                        .font(.caption)
+                                }
+                            }
+                        }
+                    }
+
+                    // 创建的文件
+                    if let filesCreated = output.filesCreated, !filesCreated.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("创建的文件:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            ForEach(filesCreated, id: \.self) { file in
+                                HStack {
+                                    Image(systemName: "doc.fill")
+                                        .foregroundColor(.blue)
+                                    Text(file)
+                                        .font(.caption.monospaced())
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         .padding()

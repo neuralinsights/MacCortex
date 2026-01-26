@@ -147,7 +147,7 @@ struct TaskHistoryView: View {
 
                             Button {
                                 // TODO: 实现重新执行
-                                viewModel.userInput = task.userInput
+                                viewModel.userInput = task.userInput ?? ""
                             } label: {
                                 Label("使用此输入", systemImage: "arrow.clockwise")
                             }
@@ -412,8 +412,8 @@ struct TaskDetailSheet: View {
                 VStack(alignment: .leading, spacing: 20) {
                     // 任务信息
                     DetailSection(title: "任务信息") {
-                        DetailItem(label: "用户输入", value: task.userInput)
-                        DetailItem(label: "工作空间", value: task.workspacePath)
+                        DetailItem(label: "用户输入", value: task.userInput ?? "未知")
+                        DetailItem(label: "工作空间", value: task.workspacePath ?? "未知")
                         DetailItem(label: "状态", value: task.status.displayName, color: task.status.color)
                         DetailItem(label: "进度", value: "\(Int(task.progress * 100))%")
                         DetailItem(label: "当前 Agent", value: task.currentAgent ?? "无")
@@ -490,8 +490,8 @@ struct TaskDetailSheet: View {
             HStack(spacing: 12) {
                 Button {
                     // 使用此输入重新创建任务
-                    viewModel.userInput = task.userInput
-                    viewModel.workspacePath = task.workspacePath
+                    viewModel.userInput = task.userInput ?? ""
+                    viewModel.workspacePath = task.workspacePath ?? ""
                     dismiss()
                 } label: {
                     Label("使用此输入", systemImage: "arrow.clockwise")

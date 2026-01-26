@@ -217,19 +217,30 @@ struct AnyCodable: Codable {
 
 /// 任务输出结果
 struct TaskOutput: Codable, Equatable {
-    let filesCreated: [String]?
+    let passed: Bool?
     let summary: String?
+    let achievements: [String]?
+    let issues: [String]?
+    let feedback: String?
+    let recommendation: String?
+    let filesCreated: [String]?
     let details: [String: AnyCodable]?
 
     enum CodingKeys: String, CodingKey {
-        case filesCreated = "files_created"
+        case passed
         case summary
+        case achievements
+        case issues
+        case feedback
+        case recommendation
+        case filesCreated = "files_created"
         case details
     }
 
     static func == (lhs: TaskOutput, rhs: TaskOutput) -> Bool {
-        lhs.filesCreated == rhs.filesCreated &&
-        lhs.summary == rhs.summary
+        lhs.passed == rhs.passed &&
+        lhs.summary == rhs.summary &&
+        lhs.filesCreated == rhs.filesCreated
     }
 }
 
@@ -264,8 +275,8 @@ struct HITLInterrupt: Identifiable, Codable, Equatable {
 /// Swarm 编排任务模型
 struct SwarmTask: Identifiable, Codable, Equatable {
     let id: String
-    let userInput: String
-    let workspacePath: String
+    let userInput: String?  // 后端详情接口不返回此字段
+    let workspacePath: String?  // 后端详情接口不返回此字段
     let status: TaskStatus
     let progress: Double
     let currentAgent: String?
@@ -287,6 +298,80 @@ struct SwarmTask: Identifiable, Codable, Equatable {
         case updatedAt = "updated_at"
         case interrupts
         case output
+    }
+
+    /// 自定义解码器（处理后端返回的字符串类型 agent 状态）
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try container.decode(String.self, forKey: .id)
+        userInput = try container.decodeIfPresent(String.self, forKey: .userInput)
+        workspacePath = try container.decodeIfPresent(String.self, forKey: .workspacePath)
+        status = try container.decode(TaskStatus.self, forKey: .status)
+        progress = try container.decode(Double.self, forKey: .progress)
+        currentAgent = try container.decodeIfPresent(String.self, forKey: .currentAgent)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        interrupts = try container.decodeIfPresent([HITLInterrupt].self, forKey: .interrupts) ?? []
+        output = try container.decodeIfPresent(TaskOutput.self, forKey: .output)
+
+        // 解码 agents_status（后端返回 [String: String]，需要转换为 [String: AgentStatus]）
+        let rawAgentsStatus = try container.decodeIfPresent([String: String].self, forKey: .agentsStatus) ?? [:]
+        var convertedStatus: [String: AgentStatus] = [:]
+        for (key, value) in rawAgentsStatus {
+            if let agentStatus = AgentStatus(rawValue: value) {
+                convertedStatus[key] = agentStatus
+            } else {
+                convertedStatus[key] = .pending  // 默认为 pending
+            }
+        }
+        agentsStatus = convertedStatus
+    }
+
+    /// 编码器
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(userInput, forKey: .userInput)
+        try container.encodeIfPresent(workspacePath, forKey: .workspacePath)
+        try container.encode(status, forKey: .status)
+        try container.encode(progress, forKey: .progress)
+        try container.encodeIfPresent(currentAgent, forKey: .currentAgent)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(interrupts, forKey: .interrupts)
+        try container.encodeIfPresent(output, forKey: .output)
+
+        // 编码 agents_status 为 [String: String]
+        let rawAgentsStatus = agentsStatus.mapValues { $0.rawValue }
+        try container.encode(rawAgentsStatus, forKey: .agentsStatus)
+    }
+
+    /// 手动初始化器（用于在代码中创建实例）
+    init(
+        id: String,
+        userInput: String?,
+        workspacePath: String?,
+        status: TaskStatus,
+        progress: Double,
+        currentAgent: String?,
+        agentsStatus: [String: AgentStatus],
+        createdAt: Date,
+        updatedAt: Date,
+        interrupts: [HITLInterrupt],
+        output: TaskOutput?
+    ) {
+        self.id = id
+        self.userInput = userInput
+        self.workspacePath = workspacePath
+        self.status = status
+        self.progress = progress
+        self.currentAgent = currentAgent
+        self.agentsStatus = agentsStatus
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.interrupts = interrupts
+        self.output = output
     }
 
     /// 任务持续时间（秒）
@@ -440,6 +525,7 @@ enum WSMessageType: String, Codable {
     case statusChanged = "status_changed"
     case agentStatus = "agent_status"
     case progress = "progress"
+    case intermediateStep = "intermediate_step"  // 中间处理步骤
     case hitlInterrupt = "hitl_interrupt"
     case approvalReceived = "approval_received"
     case taskCompleted = "task_completed"
