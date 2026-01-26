@@ -31,7 +31,7 @@
 - **主要语言**：Swift (Frontend) + Python (Backend)
 - **平台**：macOS 14.0+ (ARM64)
 - **项目路径**：/Users/jamesg/projects/MacCortex
-- **当前分支**：`feature/multi-llm-support`
+- **当前分支**：`frosty-kalam`
 
 ---
 
@@ -64,23 +64,45 @@
    - SettingsView 新增"模型"标签页
 
 ### 测试覆盖
-- **Backend**: 510 tests passed ✅
+- **Backend**: 535 tests passed ✅ (原 510 + 新增 25 Provider 测试)
 - **Swift**: Build complete ✅
 
 ### 关键修复
 - UsageTracker 死锁 (Lock → RLock)
 - 测试导入路径配置
+- planner.py 缺少 Path 导入 (2026-01-26)
+
+---
+
+## 最新更新 (2026-01-26 20:10 +13:00)
+
+### 🚀 Phase 5 P1/P2: 扩展 Provider 完成
+
+新增三个 LLM Provider 实现：
+
+| Provider | 模型 | 定价 (USD/1M tokens) | 特点 |
+|----------|------|---------------------|------|
+| **DeepSeek** | deepseek-chat, deepseek-reasoner | $0.27/$1.10 | 极高性价比 |
+| **Google Gemini** | gemini-2.0-flash, gemini-1.5-pro | $0.10/$0.40 | 2M 上下文窗口 |
+| **MLX** | Qwen2.5, Llama-3.2 (本地) | $0/$0 | Apple Silicon 加速 |
+
+**新增文件**:
+- `Backend/src/llm/providers/deepseek.py` (~270 行)
+- `Backend/src/llm/providers/gemini.py` (~300 行)
+- `Backend/src/llm/providers/mlx.py` (~350 行)
+- `Backend/tests/llm/test_providers.py` (25 测试)
+
+**提交记录**:
+- `34f3d39` - [FEATURE] 扩展 Provider：DeepSeek + Gemini + MLX
+- `d84e9e0` - [FIX] 修复 planner.py 缺少 Path 导入的 Bug
 
 ## 下一步计划
 
 ### 🔀 待合并
-- [ ] 创建 PR: `feature/multi-llm-support` → `main`
-- PR 链接: https://github.com/neuralinsights/MacCortex/compare/main...feature/multi-llm-support
+- [x] 推送分支到 origin ✅
+- [ ] 创建 PR: `frosty-kalam` → `main`
 
-### 🔧 可选扩展 (Phase 5)
-- [ ] DeepSeek Provider 实现
-- [ ] Google Gemini Provider 实现
-- [ ] MLX Provider (Apple Silicon)
+### 🔧 待完成
 - [ ] 连接 Swift 前端到真实 Backend API
 
 ### 📚 文档
