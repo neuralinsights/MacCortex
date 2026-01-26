@@ -59,6 +59,15 @@ class CreateTaskResponse(BaseModel):
     websocket_url: str
 
 
+class TokenUsageSummary(BaseModel):
+    """Token 使用量摘要"""
+    total_tokens: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost: str = "0.000000"
+    formatted_cost: str = "$0.00"
+
+
 class TaskStatusResponse(BaseModel):
     """任务状态响应"""
     task_id: str
@@ -70,6 +79,7 @@ class TaskStatusResponse(BaseModel):
     agents_status: Dict[str, str]
     interrupts: List[Dict[str, Any]]
     output: Optional[Dict[str, Any]] = None
+    token_usage: Optional[TokenUsageSummary] = None  # Phase 5: Token 使用量
 
 
 class HITLApprovalRequest(BaseModel):
@@ -141,7 +151,15 @@ class TaskManager:
             "interrupts": [],
             "output": None,
             "enable_hitl": enable_hitl,
-            "enable_code_review": enable_code_review
+            "enable_code_review": enable_code_review,
+            # Phase 5: Token 使用量追踪
+            "token_usage": {
+                "total_tokens": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_cost": "0.000000",
+                "formatted_cost": "$0.00"
+            }
         }
 
         self.tasks[task_id] = task
@@ -277,6 +295,18 @@ async def get_task_status(task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # Phase 5: 构建 token_usage 响应
+    token_usage_data = task.get("token_usage")
+    token_usage = None
+    if token_usage_data:
+        token_usage = TokenUsageSummary(
+            total_tokens=token_usage_data.get("total_tokens", 0),
+            input_tokens=token_usage_data.get("input_tokens", 0),
+            output_tokens=token_usage_data.get("output_tokens", 0),
+            total_cost=token_usage_data.get("total_cost", "0.000000"),
+            formatted_cost=token_usage_data.get("formatted_cost", "$0.00")
+        )
+
     return TaskStatusResponse(
         task_id=task["task_id"],
         status=task["status"],
@@ -286,7 +316,8 @@ async def get_task_status(task_id: str):
         updated_at=task["updated_at"],
         agents_status=task["agents_status"],
         interrupts=task.get("interrupts", []),
-        output=task.get("output")
+        output=task.get("output"),
+        token_usage=token_usage
     )
 
 
@@ -563,18 +594,47 @@ async def _execute_task(task_id: str):
                         agents_status[node_name] = "completed"
                         task_manager.update_task(task_id, {"agents_status": agents_status})
 
-                    # Phase 5: 广播 Token 使用量更新
+                    # Phase 5: 广播 Token 使用量更新并更新 task
                     if isinstance(node_output, dict):
-                        token_usage = node_output.get("token_usage_by_agent")
+                        token_usage_by_agent = node_output.get("token_usage_by_agent")
                         total_tokens = node_output.get("total_tokens", 0)
                         total_cost = node_output.get("total_cost", "0.000000")
 
-                        if token_usage or total_tokens > 0:
+                        if token_usage_by_agent or total_tokens > 0:
+                            # 计算 input/output tokens 总和
+                            input_tokens = 0
+                            output_tokens = 0
+                            if token_usage_by_agent:
+                                for agent_usage in token_usage_by_agent.values():
+                                    if isinstance(agent_usage, dict):
+                                        input_tokens += agent_usage.get("input_tokens", 0)
+                                        output_tokens += agent_usage.get("output_tokens", 0)
+
+                            # 格式化成本
+                            try:
+                                cost_float = float(total_cost)
+                                formatted_cost = f"${cost_float:.4f}"
+                            except (ValueError, TypeError):
+                                formatted_cost = "$0.00"
+
+                            # 更新 task 的 token_usage
+                            task_manager.update_task(task_id, {
+                                "token_usage": {
+                                    "total_tokens": total_tokens,
+                                    "input_tokens": input_tokens,
+                                    "output_tokens": output_tokens,
+                                    "total_cost": total_cost,
+                                    "formatted_cost": formatted_cost
+                                }
+                            })
+
+                            # 广播 WebSocket 消息
                             await task_manager.broadcast_to_websockets(task_id, {
                                 "type": "token_update",
                                 "total_tokens": total_tokens,
                                 "total_cost": total_cost,
-                                "usage_by_agent": token_usage or {},
+                                "formatted_cost": formatted_cost,
+                                "usage_by_agent": token_usage_by_agent or {},
                                 "timestamp": datetime.now().isoformat()
                             })
 

@@ -131,6 +131,25 @@ class ModelRouterV2:
             return provider.get_model_info(model_id)
         return None
 
+    def is_model_available(self, model_id: str) -> bool:
+        """检查模型是否可用"""
+        provider = self.get_provider_for_model(model_id)
+        return provider is not None and provider.is_available
+
+    @property
+    def default_model_id(self) -> str:
+        """获取默认模型 ID"""
+        # 优先使用 Fallback 链的第一个可用模型
+        for model_id in self._fallback_chain:
+            if self.is_model_available(model_id):
+                return model_id
+        # 否则返回第一个可用模型
+        models = self.get_available_models()
+        if models:
+            return models[0].id
+        # 默认返回 claude-sonnet-4
+        return "claude-sonnet-4"
+
     async def invoke(
         self,
         model_id: str,
@@ -362,5 +381,44 @@ async def create_router(
     if await ollama._check_availability():
         await ollama.refresh_models()
         router.register_provider(ollama)
+
+    return router
+
+
+def create_default_router() -> ModelRouterV2:
+    """
+    创建默认的 ModelRouterV2 实例（同步版本）
+
+    自动从环境变量读取 API Key：
+    - ANTHROPIC_API_KEY
+    - OPENAI_API_KEY
+    - OLLAMA_HOST
+
+    Returns:
+        ModelRouterV2: 配置好的路由器实例
+    """
+    import os
+    from .providers import ClaudeProvider, OpenAIProvider, OllamaProvider
+
+    router = ModelRouterV2(
+        fallback_chain=["claude-sonnet-4", "gpt-4o", "ollama/qwen3:14b"]
+    )
+
+    # 注册 Claude Provider
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    if anthropic_key:
+        router.register_provider(ClaudeProvider(api_key=anthropic_key))
+        logger.info("Registered Claude provider")
+
+    # 注册 OpenAI Provider
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
+        router.register_provider(OpenAIProvider(api_key=openai_key))
+        logger.info("Registered OpenAI provider")
+
+    # 注册 Ollama Provider（本地，不做可用性检查，留给运行时）
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    router.register_provider(OllamaProvider(host=ollama_host))
+    logger.info(f"Registered Ollama provider at {ollama_host}")
 
     return router

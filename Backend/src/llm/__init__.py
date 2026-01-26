@@ -26,7 +26,7 @@ from .models import (
     ProviderType,
 )
 from .protocol import LLMProviderProtocol
-from .router import ModelRouterV2
+from .router import ModelRouterV2, create_default_router
 from .usage_tracker import UsageTracker
 
 __all__ = [
@@ -41,6 +41,7 @@ __all__ = [
     "LLMProviderProtocol",
     # Router
     "ModelRouterV2",
+    "create_default_router",
     # Tracker
     "UsageTracker",
 ]

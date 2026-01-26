@@ -288,6 +288,10 @@ class VersionResponse(BaseModel):
 from api.swarm_routes import router as swarm_router
 app.include_router(swarm_router)
 
+# Phase 5: 集成 LLM API (模型信息与使用统计)
+from api.llm_routes import router as llm_router
+app.include_router(llm_router)
+
 # 启动时间（用于计算 uptime）
 startup_time = datetime.now()
 
