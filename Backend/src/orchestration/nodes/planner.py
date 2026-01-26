@@ -2,16 +2,21 @@
 MacCortex Planner Node - 任务拆解与计划生成
 
 Planner Agent 负责将复杂的用户任务拆解为可执行的子任务列表。
+
+Phase 5: 集成 ModelRouterV2 实现 Token 使用量追踪
 """
 
 import json
 import os
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, TYPE_CHECKING
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from ..state import SwarmState, Plan, Subtask
+from ..state import SwarmState, Plan, Subtask, update_token_usage
+
+if TYPE_CHECKING:
+    from ...llm import ModelRouterV2
 
 
 def _cn_to_number(cn_str: str) -> Optional[int]:
@@ -197,26 +202,36 @@ class PlannerNode:
         min_subtasks: int = 3,
         llm: Optional[Any] = None,
         fallback_to_local: bool = True,
-        using_local_model: Optional[bool] = None
+        using_local_model: Optional[bool] = None,
+        router: Optional["ModelRouterV2"] = None,
+        model_id: Optional[str] = None,
     ):
         """
         初始化 Planner Node
 
         Args:
-            model: Claude 模型名称
+            model: Claude 模型名称（兼容旧版）
             temperature: 温度参数（0.2 更确定性，适合任务拆解）
             max_subtasks: 最大子任务数量
             min_subtasks: 最小子任务数量
-            llm: 可选的 LLM 实例（用于测试时依赖注入）
+            llm: 可选的 LLM 实例（用于测试时依赖注入，兼容旧版）
             fallback_to_local: 当 API Key 缺失时是否降级到本地模型
             using_local_model: 显式指定是否使用本地模型（当注入 llm 时使用）
+            router: ModelRouterV2 实例（Phase 5 新增）
+            model_id: 使用的模型 ID（配合 router 使用）
         """
-        # 使用注入的 LLM 或创建新的 LLM
+        # Phase 5: 优先使用 ModelRouterV2
+        self.router = router
+        self.model_id = model_id or "claude-sonnet-4"
+        self.temperature = temperature
+
+        # 使用注入的 LLM 或创建新的 LLM（兼容旧版）
         if llm is not None:
             self.llm = llm
             # 使用显式传递的标志，或默认为 False
             self.using_local_model = using_local_model if using_local_model is not None else False
-        else:
+        elif router is None:
+            # 无 router 时回退到旧版逻辑
             # 检查 API Key
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
@@ -240,6 +255,12 @@ class PlannerNode:
                     anthropic_api_key=api_key
                 )
                 self.using_local_model = False
+        else:
+            # 使用 router 时，不需要旧版 llm
+            self.llm = None
+            # 检测是否为本地模型
+            model_info = router.get_model_info(self.model_id)
+            self.using_local_model = model_info.is_local if model_info else False
 
         self.max_subtasks = max_subtasks
 
@@ -374,17 +395,51 @@ class PlannerNode:
             HumanMessage(content=user_prompt)
         ]
 
-        if self.using_local_model:
+        # Phase 5: 优先使用 ModelRouterV2
+        if self.router is not None:
+            # 使用 ModelRouterV2 调用
+            from ...llm import ModelConfig
+            config = ModelConfig(
+                temperature=self.temperature,
+                max_tokens=max_output_tokens,
+            )
+            # 转换 LangChain 消息格式为 dict 格式
+            messages_dict = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            llm_response = await self.router.invoke(
+                model_id=self.model_id,
+                messages=messages_dict,
+                config=config,
+                agent_name="planner",
+            )
+            content = llm_response.content
+
+            # 追踪 Token 使用量
+            state = update_token_usage(
+                state=state,
+                agent_name="planner",
+                input_tokens=llm_response.usage.input_tokens,
+                output_tokens=llm_response.usage.output_tokens,
+                cost=str(llm_response.cost.total_cost),
+            )
+            print(f"[Planner] Token 使用: input={llm_response.usage.input_tokens}, "
+                  f"output={llm_response.usage.output_tokens}, "
+                  f"cost={llm_response.cost.formatted_total}")
+        elif self.using_local_model:
             # Ollama 模型：不使用 bind() 动态设置 num_predict（langchain-ollama 1.0.1 兼容性问题）
             # 改为直接调用，让模型自己控制输出长度
             response = await self.llm.ainvoke(messages)
+            content = response.content
         else:
             # Anthropic 模型：直接传递 max_tokens
             response = await self.llm.ainvoke(messages, max_tokens=max_output_tokens)
+            content = response.content
 
         # 解析 LLM 输出
         try:
-            plan = self._parse_plan(response.content)
+            plan = self._parse_plan(content)
 
             # 评估任务复杂度，确定动态最小子任务数
             task_complexity = self._evaluate_task_complexity(user_task)

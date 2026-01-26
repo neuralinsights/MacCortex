@@ -3,16 +3,21 @@ MacCortex Coder Agent
 
 代码生成节点，根据子任务需求生成可执行代码。
 支持多语言（Python、Swift、Bash）并能根据审查反馈修复问题。
+
+Phase 5: 集成 ModelRouterV2 实现 Token 使用量追踪
 """
 
 import os
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from ..state import SwarmState, Subtask
+from ..state import SwarmState, Subtask, update_token_usage
+
+if TYPE_CHECKING:
+    from ...llm import ModelRouterV2
 
 
 class CoderNode:
@@ -33,24 +38,34 @@ class CoderNode:
         temperature: float = 0.3,
         llm: Optional[Any] = None,
         fallback_to_local: bool = True,
-        using_local_model: Optional[bool] = None
+        using_local_model: Optional[bool] = None,
+        router: Optional["ModelRouterV2"] = None,
+        model_id: Optional[str] = None,
     ):
         """
         初始化 Coder Node
 
         Args:
             workspace_path: 工作空间路径（用于写入生成的代码）
-            model: Claude 模型名称
+            model: Claude 模型名称（兼容旧版）
             temperature: 温度参数（0.3 为代码生成推荐值）
-            llm: 可选的 LLM 实例（用于测试时依赖注入）
+            llm: 可选的 LLM 实例（用于测试时依赖注入，兼容旧版）
             fallback_to_local: 当 API Key 缺失时是否降级到本地模型
             using_local_model: 显式指定是否使用本地模型（当注入 llm 时使用）
+            router: ModelRouterV2 实例（Phase 5 新增）
+            model_id: 使用的模型 ID（配合 router 使用）
         """
-        # 使用注入的 LLM 或创建新的 LLM
+        # Phase 5: 优先使用 ModelRouterV2
+        self.router = router
+        self.model_id = model_id or "claude-sonnet-4"
+        self.temperature = temperature
+
+        # 使用注入的 LLM 或创建新的 LLM（兼容旧版）
         if llm is not None:
             self.llm = llm
             self.using_local_model = using_local_model if using_local_model is not None else False
-        else:
+        elif router is None:
+            # 无 router 时回退到旧版逻辑
             api_key = os.getenv("ANTHROPIC_API_KEY")
             if not api_key:
                 if fallback_to_local:
@@ -72,6 +87,12 @@ class CoderNode:
                     anthropic_api_key=api_key
                 )
                 self.using_local_model = False
+        else:
+            # 使用 router 时，不需要旧版 llm
+            self.llm = None
+            # 检测是否为本地模型
+            model_info = router.get_model_info(self.model_id)
+            self.using_local_model = model_info.is_local if model_info else False
 
         self.workspace = Path(workspace_path)
         self.workspace.mkdir(parents=True, exist_ok=True)
@@ -178,16 +199,50 @@ if __name__ == "__main__":
             HumanMessage(content=user_prompt)
         ]
 
-        if self.using_local_model:
+        # Phase 5: 优先使用 ModelRouterV2
+        if self.router is not None:
+            # 使用 ModelRouterV2 调用
+            from ...llm import ModelConfig
+            config = ModelConfig(
+                temperature=self.temperature,
+                max_tokens=max_output_tokens,
+            )
+            # 转换 LangChain 消息格式为 dict 格式
+            messages_dict = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            llm_response = await self.router.invoke(
+                model_id=self.model_id,
+                messages=messages_dict,
+                config=config,
+                agent_name="coder",
+            )
+            content = llm_response.content
+
+            # 追踪 Token 使用量
+            state = update_token_usage(
+                state=state,
+                agent_name="coder",
+                input_tokens=llm_response.usage.input_tokens,
+                output_tokens=llm_response.usage.output_tokens,
+                cost=str(llm_response.cost.total_cost),
+            )
+            print(f"[Coder] Token 使用: input={llm_response.usage.input_tokens}, "
+                  f"output={llm_response.usage.output_tokens}, "
+                  f"cost={llm_response.cost.formatted_total}")
+        elif self.using_local_model:
             # Ollama 模型：不使用 bind() 动态设置 num_predict（langchain-ollama 1.0.1 兼容性问题）
             # 改为直接调用，让模型自己控制输出长度
             response = await self.llm.ainvoke(messages)
+            content = response.content
         else:
             # Anthropic 模型：直接传递 max_tokens
             response = await self.llm.ainvoke(messages, max_tokens=max_output_tokens)
+            content = response.content
 
         # 提取代码
-        code, language = self._extract_code(response.content)
+        code, language = self._extract_code(content)
 
         # 推断文件名和扩展名
         extension = self._get_extension(language)
