@@ -529,6 +529,7 @@ enum WSMessageType: String, Codable {
     case hitlInterrupt = "hitl_interrupt"
     case approvalReceived = "approval_received"
     case taskCompleted = "task_completed"
+    case tokenUpdate = "token_update"  // Phase 4: Token 使用量更新
     case error = "error"
 }
 
@@ -561,6 +562,13 @@ struct WSMessage: Codable {
     // Task completed specific fields
     let output: TaskOutput?
 
+    // Token update specific fields (Phase 4)
+    let totalTokens: Int?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let totalCost: String?
+    let formattedCost: String?
+
     enum CodingKeys: String, CodingKey {
         case type
         case timestamp
@@ -578,6 +586,11 @@ struct WSMessage: Codable {
         case errorCode = "error_code"
         case message
         case output
+        case totalTokens = "total_tokens"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case totalCost = "total_cost"
+        case formattedCost = "formatted_cost"
     }
 }
 

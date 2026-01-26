@@ -428,6 +428,13 @@ class SwarmAPIClient: ObservableObject {
                 }
                 disconnectWebSocket()
 
+            case .tokenUpdate:
+                // Phase 4: Token 使用量更新 - 目前仅记录日志，未来可添加 UI 更新
+                if let totalTokens = message.totalTokens,
+                   let formattedCost = message.formattedCost {
+                    print("[SwarmAPIClient] Token 更新: \(totalTokens) tokens, \(formattedCost)")
+                }
+
             case .error:
                 // 错误通知
                 if let errorMessage = message.message {
