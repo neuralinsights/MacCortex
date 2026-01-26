@@ -409,6 +409,8 @@ class SwarmAPIClient: ObservableObject {
             case .taskCompleted:
                 // 任务完成
                 if let task = currentTask {
+                    // 使用 WebSocket 消息中的 output，如果没有则保留原有值
+                    let taskOutput = message.output ?? task.output
                     // 创建新的 SwarmTask 实例（Swift 值类型模式）
                     currentTask = SwarmTask(
                         id: task.id,
@@ -421,7 +423,7 @@ class SwarmAPIClient: ObservableObject {
                         createdAt: task.createdAt,
                         updatedAt: Date(),
                         interrupts: task.interrupts,
-                        output: task.output
+                        output: taskOutput
                     )
                 }
                 disconnectWebSocket()

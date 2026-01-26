@@ -233,6 +233,8 @@ class SwarmViewModel: ObservableObject {
         apiClient.currentTask = nil
         apiClient.activeInterrupt = nil
         apiClient.disconnectWebSocket()
+        // 手动通知 UI 刷新（因为嵌套 @Published 不会自动传递变化）
+        objectWillChange.send()
     }
 
     // MARK: - Computed Properties

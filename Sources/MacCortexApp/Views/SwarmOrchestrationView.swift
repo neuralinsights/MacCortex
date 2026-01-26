@@ -52,6 +52,10 @@ struct SwarmOrchestrationView: View {
             // 启动时加载历史
             await viewModel.loadTaskHistory()
         }
+        // 监听 apiClient 的变化以刷新视图
+        .onReceive(viewModel.apiClient.objectWillChange) { _ in
+            // 空操作，仅触发 SwiftUI 重新评估视图
+        }
     }
 
     // MARK: - Sidebar View
@@ -113,54 +117,18 @@ struct SwarmOrchestrationView: View {
     private var mainContentView: some View {
         if let currentTask = viewModel.apiClient.currentTask {
             // 有活跃任务：显示工作流可视化
-            VStack(spacing: 0) {
-                // 顶部工具栏：返回按钮
-                HStack {
-                    Button {
-                        viewModel.clearCurrentTask()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("新建任务")
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(.accentColor)
-
-                    Spacer()
-
-                    // 任务状态指示
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(currentTask.status.color)
-                            .frame(width: 8, height: 8)
-                        Text(currentTask.status.displayName)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+            TaskDetailView(
+                task: currentTask,
+                connectionStatus: viewModel.apiClient.connectionStatus,
+                onBack: {
+                    viewModel.clearCurrentTask()
+                },
+                onRefresh: {
+                    Task {
+                        _ = try? await viewModel.apiClient.fetchTaskStatus(taskId: currentTask.id)
                     }
                 }
-                .padding()
-                .background(Color(NSColor.windowBackgroundColor))
-
-                Divider()
-
-                // 任务详情滚动区域
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // 任务信息卡片
-                        TaskInfoCard(task: currentTask)
-
-                        // 工作流可视化
-                        WorkflowVisualizationSection(task: currentTask)
-
-                        // 连接状态
-                        ConnectionStatusBanner(
-                            status: viewModel.apiClient.connectionStatus
-                        )
-                    }
-                    .padding()
-                }
-            }
+            )
         } else {
             // 无活跃任务：显示任务输入
             TaskInputView(viewModel: viewModel)
@@ -490,6 +458,74 @@ struct ConnectionStatusBanner: View {
         case .connecting: return "wifi.exclamationmark"
         case .connected: return "wifi"
         case .error: return "exclamationmark.triangle"
+        }
+    }
+}
+
+/// 任务详情视图（独立组件，确保响应状态变化）
+struct TaskDetailView: View {
+    let task: SwarmTask
+    let connectionStatus: ConnectionStatus
+    let onBack: () -> Void
+    let onRefresh: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 顶部工具栏：返回按钮和刷新按钮
+            HStack {
+                Button {
+                    onBack()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("新建任务")
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.accentColor)
+
+                Spacer()
+
+                // 刷新按钮（当任务未完成时显示）
+                if task.status != .completed && task.status != .failed {
+                    Button {
+                        onRefresh()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                }
+
+                // 任务状态指示
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(task.status.color)
+                        .frame(width: 8, height: 8)
+                    Text(task.status.displayName)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .background(Color(NSColor.windowBackgroundColor))
+
+            Divider()
+
+            // 任务详情滚动区域
+            ScrollView {
+                VStack(spacing: 24) {
+                    // 任务信息卡片
+                    TaskInfoCard(task: task)
+
+                    // 工作流可视化
+                    WorkflowVisualizationSection(task: task)
+
+                    // 连接状态
+                    ConnectionStatusBanner(status: connectionStatus)
+                }
+                .padding()
+            }
         }
     }
 }

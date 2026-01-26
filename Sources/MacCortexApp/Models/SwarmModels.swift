@@ -558,6 +558,9 @@ struct WSMessage: Codable {
     let errorCode: String?
     let message: String?
 
+    // Task completed specific fields
+    let output: TaskOutput?
+
     enum CodingKeys: String, CodingKey {
         case type
         case timestamp
@@ -574,6 +577,7 @@ struct WSMessage: Codable {
         case details
         case errorCode = "error_code"
         case message
+        case output
     }
 }
 
