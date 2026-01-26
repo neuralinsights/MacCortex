@@ -411,6 +411,7 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     **连接后接收的消息类型**:
     - agent_status: Agent 状态更新
     - progress: 进度更新
+    - token_update: Token 使用量更新（Phase 5 新增）
     - hitl_interrupt: HITL 中断通知
     - task_completed: 任务完成
     - error: 错误通知
@@ -493,6 +494,8 @@ async def _execute_task(task_id: str):
             # 控制
             "iteration_count": 0,
             "total_tokens": 0,
+            "total_cost": "0.000000",  # Phase 5: 累计成本 (USD)
+            "token_usage_by_agent": {},  # Phase 5: 按 Agent 分组的 Token 使用
             "start_time": time.time(),
             "status": "planning",  # 从 planning 开始，不是 executing
             "user_interrupted": False,
@@ -559,6 +562,21 @@ async def _execute_task(task_id: str):
                     if node_name in agents_status:
                         agents_status[node_name] = "completed"
                         task_manager.update_task(task_id, {"agents_status": agents_status})
+
+                    # Phase 5: 广播 Token 使用量更新
+                    if isinstance(node_output, dict):
+                        token_usage = node_output.get("token_usage_by_agent")
+                        total_tokens = node_output.get("total_tokens", 0)
+                        total_cost = node_output.get("total_cost", "0.000000")
+
+                        if token_usage or total_tokens > 0:
+                            await task_manager.broadcast_to_websockets(task_id, {
+                                "type": "token_update",
+                                "total_tokens": total_tokens,
+                                "total_cost": total_cost,
+                                "usage_by_agent": token_usage or {},
+                                "timestamp": datetime.now().isoformat()
+                            })
 
                     # 提取 final_output（来自 reflector 或最后一个节点）
                     if isinstance(node_output, dict) and "final_output" in node_output:
