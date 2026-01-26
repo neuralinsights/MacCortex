@@ -30,26 +30,33 @@ struct SettingsView: View {
                     }
                     .tag(0)
 
-                // Tab 2: 剪贴板设置
+                // Tab 2: LLM 模型设置 (Phase 4)
+                LLMSettingsTabView()
+                    .tabItem {
+                        Label("模型", systemImage: "brain.head.profile")
+                    }
+                    .tag(1)
+
+                // Tab 3: 剪贴板设置
                 ClipboardSettingsView()
                     .tabItem {
                         Label("剪贴板", systemImage: "doc.on.clipboard")
                     }
-                    .tag(1)
+                    .tag(2)
 
-                // Tab 3: 快捷键设置
+                // Tab 4: 快捷键设置
                 ShortcutsSettingsView()
                     .tabItem {
                         Label("快捷键", systemImage: "command")
                     }
-                    .tag(2)
+                    .tag(3)
 
-                // Tab 4: 高级设置
+                // Tab 5: 高级设置
                 AdvancedSettingsView()
                     .tabItem {
                         Label("高级", systemImage: "slider.horizontal.3")
                     }
-                    .tag(3)
+                    .tag(4)
             }
 
             Divider()
@@ -839,6 +846,317 @@ enum AppTheme: String, CaseIterable {
         case .light: return "浅色"
         case .dark: return "深色"
         }
+    }
+}
+
+// MARK: - Tab 2: LLM 模型设置 (Phase 4)
+
+/// LLM 模型设置 Tab 视图
+struct LLMSettingsTabView: View {
+    @StateObject private var viewModel = LLMSettingsViewModel()
+
+    var body: some View {
+        Form {
+            // Section 1: API Key 配置
+            Section("API Key 配置") {
+                ForEach(LLMProvider.allCases) { provider in
+                    LLMAPIKeyRow(
+                        provider: provider,
+                        isConfigured: viewModel.isProviderConfigured(provider),
+                        onConfigure: { viewModel.showAPIKeySheet(for: provider) }
+                    )
+                }
+            }
+
+            // Section 2: 默认模型
+            Section("默认模型") {
+                if viewModel.isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("加载模型列表...")
+                            .foregroundColor(.secondary)
+                    }
+                } else if viewModel.models.isEmpty {
+                    Text("暂无可用模型。请先配置 API Key 或启动本地模型服务。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Picker("选择模型", selection: $viewModel.selectedModelId) {
+                        ForEach(viewModel.models) { model in
+                            HStack {
+                                Image(systemName: model.icon)
+                                Text(model.displayName)
+                                if !model.isAvailable {
+                                    Text("(不可用)")
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .tag(model.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    if let selectedModel = viewModel.selectedModel {
+                        HStack {
+                            ForEach(selectedModel.capabilities, id: \.self) { cap in
+                                Text(LLMModel.capabilityDisplayName(for: cap))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(LLMModel.capabilityColor(for: cap).opacity(0.2))
+                                    .foregroundColor(LLMModel.capabilityColor(for: cap))
+                                    .cornerRadius(4)
+                            }
+                        }
+
+                        if !selectedModel.isLocal {
+                            Text("定价: $\(NSDecimalNumber(decimal: selectedModel.pricing.inputPricePer1M).doubleValue, specifier: "%.2f") 输入 / $\(NSDecimalNumber(decimal: selectedModel.pricing.outputPricePer1M).doubleValue, specifier: "%.2f") 输出 ($/1M tokens)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                Button("刷新模型列表") {
+                    viewModel.refreshModels()
+                }
+                .disabled(viewModel.isLoading)
+            }
+
+            // Section 3: 使用量统计
+            Section("使用量统计") {
+                if let stats = viewModel.usageStats {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text("总 Tokens")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(stats.formattedTokens)
+                                .font(.headline)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text("总成本")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(stats.formattedCost)
+                                .font(.headline)
+                                .foregroundColor(.green)
+                        }
+                    }
+
+                    Button("重置统计", role: .destructive) {
+                        viewModel.resetUsageStats()
+                    }
+                } else {
+                    Text("暂无使用量数据")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+        .onAppear {
+            viewModel.loadData()
+        }
+        .sheet(isPresented: $viewModel.showingAPIKeySheet) {
+            if let provider = viewModel.editingProvider {
+                APIKeyEditSheet(
+                    provider: provider,
+                    isPresented: $viewModel.showingAPIKeySheet,
+                    onSave: { key in
+                        viewModel.saveAPIKey(key, for: provider)
+                    },
+                    onDelete: {
+                        viewModel.deleteAPIKey(for: provider)
+                    }
+                )
+            }
+        }
+    }
+}
+
+/// LLM API Key 配置行
+struct LLMAPIKeyRow: View {
+    let provider: LLMProvider
+    let isConfigured: Bool
+    let onConfigure: () -> Void
+
+    var body: some View {
+        HStack {
+            Image(systemName: provider.icon)
+                .foregroundColor(isConfigured ? .green : .secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.displayName)
+                Text(isConfigured ? "已配置" : "未配置")
+                    .font(.caption)
+                    .foregroundColor(isConfigured ? .green : .secondary)
+            }
+
+            Spacer()
+
+            Button(isConfigured ? "修改" : "配置") {
+                onConfigure()
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+}
+
+/// API Key 编辑弹窗
+struct APIKeyEditSheet: View {
+    let provider: LLMProvider
+    @Binding var isPresented: Bool
+    let onSave: (String) -> Void
+    let onDelete: () -> Void
+
+    @State private var apiKey = ""
+    @State private var showKey = false
+
+    var body: some View {
+        VStack(spacing: 20) {
+            // 标题
+            HStack {
+                Image(systemName: provider.icon)
+                    .font(.title2)
+                Text("配置 \(provider.displayName) API Key")
+                    .font(.headline)
+            }
+
+            // 输入框
+            HStack {
+                if showKey {
+                    TextField("输入 API Key", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
+                } else {
+                    SecureField("输入 API Key", text: $apiKey)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Button {
+                    showKey.toggle()
+                } label: {
+                    Image(systemName: showKey ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+            }
+
+            // 帮助链接
+            if let url = provider.apiKeyHelpURL {
+                Link(destination: url) {
+                    HStack {
+                        Image(systemName: "questionmark.circle")
+                        Text("如何获取 API Key?")
+                    }
+                    .font(.caption)
+                }
+            }
+
+            Divider()
+
+            // 按钮
+            HStack {
+                Button("删除", role: .destructive) {
+                    onDelete()
+                    isPresented = false
+                }
+
+                Spacer()
+
+                Button("取消") {
+                    isPresented = false
+                }
+                .keyboardShortcut(.escape)
+
+                Button("保存") {
+                    onSave(apiKey)
+                    isPresented = false
+                }
+                .keyboardShortcut(.return)
+                .disabled(apiKey.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 400)
+    }
+}
+
+/// LLM 设置 ViewModel
+@MainActor
+class LLMSettingsViewModel: ObservableObject {
+    @Published var models: [LLMModel] = []
+    @Published var selectedModelId: String = ""
+    @Published var usageStats: UsageStats?
+    @Published var isLoading = false
+    @Published var showingAPIKeySheet = false
+    @Published var editingProvider: LLMProvider?
+
+    private let apiKeyManager = APIKeyManager.shared
+
+    var selectedModel: LLMModel? {
+        models.first { $0.id == selectedModelId }
+    }
+
+    func loadData() {
+        refreshModels()
+        loadUsageStats()
+    }
+
+    func refreshModels() {
+        isLoading = true
+
+        Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+
+            await MainActor.run {
+                #if DEBUG
+                self.models = [
+                    .previewClaude,
+                    .previewGPT,
+                    .previewOllama
+                ]
+                if self.selectedModelId.isEmpty {
+                    self.selectedModelId = "claude-sonnet-4"
+                }
+                #endif
+                self.isLoading = false
+            }
+        }
+    }
+
+    func loadUsageStats() {
+        #if DEBUG
+        usageStats = .preview
+        #endif
+    }
+
+    func isProviderConfigured(_ provider: LLMProvider) -> Bool {
+        apiKeyManager.hasKey(for: provider)
+    }
+
+    func showAPIKeySheet(for provider: LLMProvider) {
+        editingProvider = provider
+        showingAPIKeySheet = true
+    }
+
+    func saveAPIKey(_ key: String, for provider: LLMProvider) {
+        if apiKeyManager.setKey(key, for: provider) {
+            refreshModels()
+        }
+    }
+
+    func deleteAPIKey(for provider: LLMProvider) {
+        if apiKeyManager.deleteKey(for: provider) {
+            refreshModels()
+        }
+    }
+
+    func resetUsageStats() {
+        usageStats = .empty
     }
 }
 

@@ -6,6 +6,7 @@ All nodes in the graph will operate on and modify this state.
 """
 
 from typing import TypedDict, List, Dict, Any, Literal, Optional
+from decimal import Decimal
 import time
 
 
@@ -31,6 +32,15 @@ class Subtask(TypedDict):
     # 工具任务专用字段
     tool_name: Optional[str]            # 工具名称（如 "write_file"）
     tool_args: Optional[Dict[str, Any]] # 工具参数
+
+
+class TokenUsageByAgent(TypedDict):
+    """单个 Agent 的 Token 使用统计"""
+    input_tokens: int                   # 输入 Token 数
+    output_tokens: int                  # 输出 Token 数
+    total_tokens: int                   # 总 Token 数
+    call_count: int                     # 调用次数
+    total_cost: str                     # 总成本 (USD 字符串，保持精度)
 
 
 class Plan(TypedDict):
@@ -70,7 +80,9 @@ class SwarmState(TypedDict):
 
     # ===== 控制 =====
     iteration_count: int                # 当前 Coder ↔ Reviewer 循环次数
-    total_tokens: int                   # 累计 Token 消耗
+    total_tokens: int                   # 累计 Token 消耗（兼容旧代码）
+    total_cost: str                     # 累计成本 (USD)
+    token_usage_by_agent: Dict[str, TokenUsageByAgent]  # 按 Agent 分组的 Token 使用
     start_time: float                   # 任务开始时间（Unix 时间戳）
     status: Literal["planning", "executing", "reviewing", "reflecting", "completed", "failed"]
     user_interrupted: bool              # 用户是否请求中断
@@ -109,6 +121,8 @@ def create_initial_state(user_input: str, context: Optional[Dict[str, Any]] = No
         # 控制
         iteration_count=0,
         total_tokens=0,
+        total_cost="0.000000",
+        token_usage_by_agent={},
         start_time=time.time(),
         status="planning",
         user_interrupted=False,
@@ -117,3 +131,69 @@ def create_initial_state(user_input: str, context: Optional[Dict[str, Any]] = No
         final_output=None,
         error_message=None
     )
+
+
+def update_token_usage(
+    state: SwarmState,
+    agent_name: str,
+    input_tokens: int,
+    output_tokens: int,
+    cost: str,
+) -> SwarmState:
+    """
+    更新 Token 使用量
+
+    Args:
+        state: 当前状态
+        agent_name: Agent 名称（如 "planner", "coder", "reviewer"）
+        input_tokens: 本次输入 Token 数
+        output_tokens: 本次输出 Token 数
+        cost: 本次成本 (USD 字符串)
+
+    Returns:
+        SwarmState: 更新后的状态
+    """
+    # 获取现有 Agent 使用量
+    usage_by_agent = dict(state.get("token_usage_by_agent", {}))
+
+    if agent_name not in usage_by_agent:
+        usage_by_agent[agent_name] = TokenUsageByAgent(
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            call_count=0,
+            total_cost="0.000000",
+        )
+
+    # 累加
+    agent_usage = usage_by_agent[agent_name]
+    new_input = agent_usage["input_tokens"] + input_tokens
+    new_output = agent_usage["output_tokens"] + output_tokens
+    new_total = new_input + new_output
+    new_count = agent_usage["call_count"] + 1
+
+    # 成本累加（使用 Decimal 保持精度）
+    old_cost = Decimal(agent_usage["total_cost"])
+    add_cost = Decimal(cost)
+    new_cost = str((old_cost + add_cost).quantize(Decimal("0.000001")))
+
+    usage_by_agent[agent_name] = TokenUsageByAgent(
+        input_tokens=new_input,
+        output_tokens=new_output,
+        total_tokens=new_total,
+        call_count=new_count,
+        total_cost=new_cost,
+    )
+
+    # 更新总计
+    total_tokens = state.get("total_tokens", 0) + input_tokens + output_tokens
+    old_total_cost = Decimal(state.get("total_cost", "0"))
+    new_total_cost = str((old_total_cost + add_cost).quantize(Decimal("0.000001")))
+
+    # 返回更新后的状态（TypedDict 是不可变的，需要创建新字典）
+    return {
+        **state,
+        "total_tokens": total_tokens,
+        "total_cost": new_total_cost,
+        "token_usage_by_agent": usage_by_agent,
+    }

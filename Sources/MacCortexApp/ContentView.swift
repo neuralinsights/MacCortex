@@ -16,6 +16,8 @@
 // 更新时间：2026-01-21
 
 import SwiftUI
+import PermissionsKit
+import AppKit
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
@@ -79,272 +81,29 @@ struct MainView: View {
         }
     }
 
-    // 权限状态视图（原有内容）
+    // 权限与系统状态视图（生产版本）
     private var permissionsView: some View {
         NavigationView {
-            VStack(spacing: 30) {
-                // 顶部标题区
-                VStack(spacing: 10) {
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 80))
-                        .foregroundColor(.blue)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // 顶部应用信息
+                    appInfoSection
 
-                    Text("MacCortex")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                    // 权限管理
+                    permissionsSection
 
-                    Text("Phase 3 - aya-23 翻译模型")
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.green.opacity(0.2))
-                        .foregroundColor(.green)
-                        .cornerRadius(4)
-                }
+                    // 连接状态
+                    connectionStatusSection
 
-                Spacer()
+                    // 数据与隐私
+                    dataPrivacySection
 
-                // 权限状态卡片
-                VStack(alignment: .leading, spacing: 15) {
-                    HStack {
-                        Image(systemName: "lock.shield")
-                            .foregroundColor(.blue)
-                        Text("权限状态")
-                            .font(.headline)
-                    }
-
-                    PermissionStatusRow(
-                        icon: "folder.fill",
-                        name: "Full Disk Access",
-                        isGranted: appState.hasFullDiskAccess,
-                        isRequired: true
-                    )
-
-                    PermissionStatusRow(
-                        icon: "cursorarrow.rays",
-                        name: "Accessibility",
-                        isGranted: appState.hasAccessibilityPermission,
-                        isRequired: false
-                    )
-
-                    // 权限管理按钮
-                    Button(action: {
-                        showSettings = true
-                    }) {
-                        HStack {
-                            Image(systemName: "gear")
-                            Text("管理权限")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(8)
-                    }
+                    // 帮助与支持
+                    helpSupportSection
                 }
                 .padding()
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(10)
-
-                // Phase 状态
-                VStack(alignment: .leading, spacing: 15) {
-                    HStack {
-                        Image(systemName: "list.bullet.clipboard")
-                            .foregroundColor(.blue)
-                        Text("开发进度")
-                            .font(.headline)
-                    }
-
-                    StatusRow(icon: "checkmark.circle.fill",
-                             text: "Phase 0.5: 签名与公证",
-                             status: .completed)
-
-                    StatusRow(icon: "checkmark.circle.fill",
-                             text: "Phase 1: Python Backend",
-                             status: .completed)
-
-                    StatusRow(icon: "checkmark.circle.fill",
-                             text: "Phase 1.5: 安全强化",
-                             status: .completed)
-
-                    StatusRow(icon: "circle.fill",
-                             text: "Phase 2 Week 1: SwiftUI 架构",
-                             status: .inProgress)
-
-                    StatusRow(icon: "circle",
-                             text: "Phase 2 Week 2: 浮动工具栏",
-                             status: .pending)
-                }
-                .padding()
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(10)
-
-                // Phase 2: 功能测试区
-                VStack(alignment: .leading, spacing: 15) {
-                    HStack {
-                        Image(systemName: "testtube.2")
-                            .foregroundColor(.blue)
-                        Text("Phase 2 功能测试")
-                            .font(.headline)
-                    }
-
-                    // 浮动工具栏开关
-                    Toggle("显示浮动工具栏", isOn: Binding(
-                        get: { appState.showFloatingToolbar },
-                        set: { appState.showFloatingToolbar = $0 }
-                    ))
-                    .toggleStyle(.switch)
-
-                    Divider()
-
-                    // 场景检测控制
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("智能场景检测")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-
-                            Spacer()
-
-                            Button(action: {
-                                if SceneDetector.shared.isDetecting {
-                                    appState.stopSceneDetection()
-                                } else {
-                                    appState.startSceneDetection()
-                                }
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: SceneDetector.shared.isDetecting ? "stop.circle.fill" : "play.circle.fill")
-                                    Text(SceneDetector.shared.isDetecting ? "停止" : "启动")
-                                }
-                                .font(.system(size: 11))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(SceneDetector.shared.isDetecting ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
-                                .foregroundColor(SceneDetector.shared.isDetecting ? .red : .green)
-                                .cornerRadius(6)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        // 实时检测信息
-                        if SceneDetector.shared.isDetecting {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("活动应用:")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                    Text(SceneDetector.shared.activeApplicationName.isEmpty ? "未检测" : SceneDetector.shared.activeApplicationName)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(.primary)
-                                }
-
-                                HStack {
-                                    Text("窗口标题:")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                    Text(SceneDetector.shared.activeWindowTitle.isEmpty ? "未授权" : SceneDetector.shared.activeWindowTitle)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                }
-
-                                HStack {
-                                    Text("检测场景:")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(.secondary)
-                                    HStack(spacing: 4) {
-                                        Image(systemName: SceneDetector.shared.currentScene.icon)
-                                            .font(.system(size: 10))
-                                        Text(SceneDetector.shared.currentScene.rawValue)
-                                            .font(.system(size: 10, weight: .medium))
-                                        Text("(\(Int(SceneDetector.shared.sceneConfidence * 100))%)")
-                                            .font(.system(size: 9))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .foregroundStyle(.primary)
-                                }
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 8)
-                            .background(Color.secondary.opacity(0.05))
-                            .cornerRadius(6)
-                        }
-                    }
-
-                    // 场景检测测试
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("场景检测测试")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        HStack(spacing: 8) {
-                            ForEach(DetectedScene.allCases.prefix(4), id: \.self) { scene in
-                                Button(action: {
-                                    appState.updateDetectedScene(scene, confidence: Double.random(in: 0.75...0.95))
-                                }) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: scene.icon)
-                                            .font(.system(size: 16))
-                                        Text(scene.rawValue)
-                                            .font(.system(size: 9))
-                                    }
-                                    .frame(width: 60, height: 50)
-                                    .background(appState.detectedScene == scene ? Color.blue.opacity(0.2) : Color.secondary.opacity(0.1))
-                                    .cornerRadius(8)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    // 信任等级测试
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("信任等级切换")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        HStack(spacing: 8) {
-                            ForEach(TrustLevel.allCases, id: \.self) { level in
-                                Button(action: {
-                                    appState.setTrustLevel(level)
-                                }) {
-                                    Text(level.displayName)
-                                        .font(.system(size: 10))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(appState.currentTrustLevel == level ? level.color.opacity(0.3) : Color.secondary.opacity(0.1))
-                                        .foregroundColor(appState.currentTrustLevel == level ? level.color : .secondary)
-                                        .cornerRadius(6)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    Divider()
-
-                    // Backend API 测试（Phase 2 Week 2 Day 6-7）
-                    BackendAPITestPanel()
-                }
-                .padding()
-                .background(Color.blue.opacity(0.05))
-                .cornerRadius(10)
-
-                Spacer()
             }
-            .padding()
-            .navigationTitle("MacCortex")
-            .overlay(
-                // 浮动工具栏叠加层
-                Group {
-                    if appState.showFloatingToolbar {
-                        FloatingToolbarView()
-                            .position(x: 200, y: 100)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
-            )
+            .navigationTitle("系统状态")
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     Button(action: {
@@ -399,6 +158,473 @@ struct MainView: View {
                     }
                 )
             }
+        }
+    }
+
+    // MARK: - 应用信息区域
+
+    private var appInfoSection: some View {
+        VStack(spacing: 16) {
+            // Logo 和名称
+            HStack(spacing: 16) {
+                Image(systemName: "brain.head.profile")
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("MacCortex")
+                        .font(.title)
+                        .fontWeight(.bold)
+
+                    Text("macOS 智能助手")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                // 版本信息
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0")")
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+
+                    Text("Build \(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Divider()
+
+            // 系统兼容性
+            HStack {
+                Image(systemName: "desktopcomputer")
+                    .foregroundColor(.secondary)
+                    .frame(width: 20)
+
+                Text("macOS 14.0+ (Sonoma)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text("Apple Silicon")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundColor(.blue)
+                    .cornerRadius(4)
+            }
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    // MARK: - 权限管理区域
+
+    private var permissionsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "lock.shield.fill")
+                    .foregroundColor(.blue)
+                Text("权限管理")
+                    .font(.headline)
+
+                Spacer()
+
+                Button(action: {
+                    Task {
+                        await appState.checkPermissions()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("刷新")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Full Disk Access
+            PermissionManagementRow(
+                icon: "folder.fill",
+                name: "Full Disk Access",
+                description: "读取笔记、文件和文档",
+                isGranted: appState.hasFullDiskAccess,
+                isRequired: true,
+                onOpenSettings: {
+                    FullDiskAccessManager.shared.openSystemPreferences()
+                }
+            )
+
+            // Accessibility
+            PermissionManagementRow(
+                icon: "cursorarrow.rays",
+                name: "Accessibility",
+                description: "自动化工作流程",
+                isGranted: appState.hasAccessibilityPermission,
+                isRequired: false,
+                onOpenSettings: {
+                    AccessibilityManager.shared.openSystemPreferences()
+                }
+            )
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    // MARK: - 连接状态区域
+
+    private var connectionStatusSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "network")
+                    .foregroundColor(.blue)
+                Text("服务状态")
+                    .font(.headline)
+            }
+
+            // Backend 状态
+            ConnectionStatusRow(
+                icon: "server.rack",
+                name: "Python Backend",
+                checkConnection: {
+                    await APIClient.shared.isBackendAvailable()
+                }
+            )
+
+            // Ollama 状态
+            ConnectionStatusRow(
+                icon: "cpu",
+                name: "Ollama (本地 AI)",
+                checkConnection: {
+                    // 检查 Ollama 是否运行
+                    let url = URL(string: "http://127.0.0.1:11434/api/tags")!
+                    do {
+                        let (_, response) = try await URLSession.shared.data(from: url)
+                        return (response as? HTTPURLResponse)?.statusCode == 200
+                    } catch {
+                        return false
+                    }
+                }
+            )
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    // MARK: - 数据与隐私区域
+
+    private var dataPrivacySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "hand.raised.fill")
+                    .foregroundColor(.blue)
+                Text("数据与隐私")
+                    .font(.headline)
+            }
+
+            // 数据存储位置
+            HStack {
+                Image(systemName: "folder")
+                    .foregroundColor(.secondary)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("本地数据存储")
+                        .font(.subheadline)
+                    Text("~/Library/Application Support/MacCortex/")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button("打开") {
+                    let path = FileManager.default.homeDirectoryForCurrentUser
+                        .appendingPathComponent("Library/Application Support/MacCortex")
+                    NSWorkspace.shared.open(path)
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            }
+
+            Divider()
+
+            // 隐私说明
+            HStack(alignment: .top) {
+                Image(systemName: "checkmark.shield")
+                    .foregroundColor(.green)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("您的数据安全")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    Text("所有数据处理均在本地完成，不会上传到云端。翻译和 AI 功能使用本地 Ollama 模型。")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Divider()
+
+            // 清除数据按钮
+            HStack {
+                Button(action: {
+                    clearCache()
+                }) {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("清除缓存")
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+            }
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    // MARK: - 帮助与支持区域
+
+    private var helpSupportSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "questionmark.circle.fill")
+                    .foregroundColor(.blue)
+                Text("帮助与支持")
+                    .font(.headline)
+            }
+
+            HStack(spacing: 12) {
+                // 使用文档
+                Button(action: {
+                    if let url = URL(string: "https://github.com/anthropics/maccortex") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "book")
+                            .font(.title2)
+                        Text("使用文档")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+
+                // 问题反馈
+                Button(action: {
+                    if let url = URL(string: "https://github.com/anthropics/maccortex/issues") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.bubble")
+                            .font(.title2)
+                        Text("问题反馈")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+
+                // 导出诊断
+                Button(action: {
+                    exportDiagnostics()
+                }) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title2)
+                        Text("导出诊断")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding()
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    // MARK: - Helper Methods
+
+    private func clearCache() {
+        let path = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/MacCortex/cache")
+        try? FileManager.default.removeItem(at: path)
+        print("[Settings] 缓存已清除")
+    }
+
+    private func exportDiagnostics() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "MacCortex_Diagnostics_\(Date().ISO8601Format()).json"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            let diagnostics: [String: Any] = [
+                "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown",
+                "build_number": Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
+                "os_version": ProcessInfo.processInfo.operatingSystemVersionString,
+                "has_full_disk_access": appState.hasFullDiskAccess,
+                "has_accessibility": appState.hasAccessibilityPermission,
+                "timestamp": ISO8601DateFormatter().string(from: Date())
+            ]
+
+            if let data = try? JSONSerialization.data(withJSONObject: diagnostics, options: .prettyPrinted) {
+                try? data.write(to: url)
+            }
+        }
+    }
+}
+
+// MARK: - 权限管理行
+
+struct PermissionManagementRow: View {
+    let icon: String
+    let name: String
+    let description: String
+    let isGranted: Bool
+    let isRequired: Bool
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 图标
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(isGranted ? .green : .orange)
+                .frame(width: 32)
+
+            // 信息
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    if isRequired {
+                        Text("必需")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Color.red.opacity(0.2))
+                            .foregroundColor(.red)
+                            .cornerRadius(3)
+                    }
+                }
+
+                Text(description)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            // 状态和操作
+            if isGranted {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("已授予")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+            } else {
+                Button("授予权限") {
+                    onOpenSettings()
+                }
+                .font(.caption)
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            }
+        }
+        .padding(12)
+        .background(isGranted ? Color.green.opacity(0.05) : Color.orange.opacity(0.05))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - 连接状态行
+
+struct ConnectionStatusRow: View {
+    let icon: String
+    let name: String
+    let checkConnection: () async -> Bool
+
+    @State private var isConnected: Bool? = nil
+    @State private var isChecking = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(.secondary)
+                .frame(width: 24)
+
+            Text(name)
+                .font(.subheadline)
+
+            Spacer()
+
+            if isChecking {
+                ProgressView()
+                    .scaleEffect(0.7)
+            } else if let connected = isConnected {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(connected ? Color.green : Color.red)
+                        .frame(width: 8, height: 8)
+                    Text(connected ? "已连接" : "未连接")
+                        .font(.caption)
+                        .foregroundColor(connected ? .green : .red)
+                }
+            } else {
+                Button("检测") {
+                    Task {
+                        await checkStatus()
+                    }
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            }
+        }
+        .onAppear {
+            Task {
+                await checkStatus()
+            }
+        }
+    }
+
+    private func checkStatus() async {
+        isChecking = true
+        let result = await checkConnection()
+        await MainActor.run {
+            isConnected = result
+            isChecking = false
         }
     }
 }
